@@ -472,7 +472,7 @@
                 <ol class="breadcrumb mb-0">
                     <li class="breadcrumb-item"><a class="text-body" href="{% url 'index' %}">Home</a></li>
                     <li class="breadcrumb-item"><a class="text-body" href="{% url 'product_list' %}">Products</a></li>
-                    <li class="breadcrumb-item"><a class="text-body" href="{% url 'product_list' %}?category={{ product.category.slug }}">{{ product.category.name }}</a></li>
+                    <li class="breadcrumb-item"><a class="text-body" href="{% url 'category_products' product.category.slug %}">{{ product.category.name }}</a></li>
                     {% if product.subcategory %}
                     <li class="breadcrumb-item"><a class="text-body" href="{% url 'product_list' %}?subcategory={{ product.subcategory.slug }}">{{ product.subcategory.name }}</a></li>
                     {% endif %}
@@ -671,7 +671,7 @@
                                     <i class="fas fa-shopping-cart me-2"></i>Add to Cart
                                 </button>
                             </form>
-                            <a href="https://wa.me/{{ product.farmer.mpesa_number|slice:'1:' }}?text={{ whatsapp_message|urlencode }}" 
+                            <a href="https://wa.me/{{ whatsapp_number }}?text={{ whatsapp_message|urlencode }}" 
                                class="btn-whatsapp" target="_blank">
                                 <i class="fab fa-whatsapp"></i>
                                 WhatsApp Order
@@ -696,7 +696,7 @@
                         </div>
                         {% endif %}
                         
-                        <a href="https://wa.me/{{ product.farmer.mpesa_number|slice:'1:' }}?text=Hi! I'm interested in {{ product.name }}. When will it be available?" 
+                        <a href="https://wa.me/{{ whatsapp_number }}?text=Hi! I'm interested in {{ product.name }}. When will it be available?" 
                            class="btn btn-outline-success mt-3">
                             <i class="fab fa-whatsapp me-2"></i>Ask about availability
                         </a>
@@ -874,13 +874,13 @@
                                 <div class="rating-breakdown mt-4">
                                     <h6>Rating Breakdown</h6>
                                     {% for i in "54321" %}
-                                    {% with rating=forloop.counter %}
+                                    {% with rating=forloop.counter0|add:1 %}
                                     <div class="rating-row">
                                         <span class="rating-label">{{ rating }} star{{ rating|pluralize }}</span>
                                         <div class="rating-progress">
-                                            <div class="rating-progress-bar" style="width: {{ rating_percentages|get_item:rating|default:0 }}%"></div>
+                                            <div class="rating-progress-bar" style="width: {{ rating_percentages|get_item:rating }}%"></div>
                                         </div>
-                                        <span class="rating-count">{{ rating_percentages|get_item:rating|default:0 }}%</span>
+                                        <span class="rating-count">{{ rating_percentages|get_item:rating }}%</span>
                                     </div>
                                     {% endwith %}
                                     {% endfor %}
@@ -1072,7 +1072,7 @@
                                     <div class="card-body text-center">
                                         <p class="mb-3">Get in touch with {{ product.farmer.farm_name }} directly</p>
                                         <div class="d-grid gap-2">
-                                            <a href="https://wa.me/{{ product.farmer.mpesa_number|slice:'1:' }}?text=Hi! I saw your {{ product.name }} on AgriConnect. I'm interested to know more." 
+                                            <a href="https://wa.me/{{ product.farmer.user.phone_number }}?text=Hi! I saw your {{ product.name }} on AgriConnect. I'm interested to know more." 
                                                class="btn btn-success" target="_blank">
                                                 <i class="fab fa-whatsapp me-2"></i>WhatsApp
                                             </a>
@@ -1089,304 +1089,3 @@
                                     </div>
                                     <div class="card-body">
                                         <p class="small text-muted mb-2">This farmer has more products available</p>
-                                        <a href="{% url 'product_list' %}?farmer={{ product.farmer.id }}" class="btn btn-sm btn-outline-primary">
-                                            <i class="fas fa-store me-2"></i>View All Products
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Related Products -->
-            {% if related_products %}
-            <div class="related-products wow fadeInUp" data-wow-delay="0.7s">
-                <h3 class="mb-4">Related Products</h3>
-                <div class="row">
-                    {% for related_product in related_products %}
-                    <div class="col-xl-3 col-lg-4 col-md-6 wow fadeInUp" data-wow-delay="{{ forloop.counter0|floatformat:1|add:"0.1" }}s">
-                        <a href="{% url 'product_detail' related_product.slug %}" class="product-item d-block">
-                            <div class="position-relative bg-light overflow-hidden">
-                                <img src="{% if related_product.main_image %}{{ related_product.main_image.image.url }}{% else %}{% static 'img/product-placeholder.jpg' %}{% endif %}" 
-                                     alt="{{ related_product.name }}" class="img-fluid">
-                                {% if related_product.discount_percentage > 0 %}
-                                <div class="position-absolute top-0 start-0 m-3 py-1 px-3 bg-danger text-white rounded">
-                                    -{{ related_product.discount_percentage }}%
-                                </div>
-                                {% endif %}
-                                {% if related_product.is_organic %}
-                                <div class="position-absolute top-0 end-0 m-3">
-                                    <span class="badge bg-success">
-                                        <i class="fas fa-leaf me-1"></i>Organic
-                                    </span>
-                                </div>
-                                {% endif %}
-                            </div>
-                            <div class="card-body text-center">
-                                <h5 class="mb-2">{{ related_product.name }}</h5>
-                                <div class="mb-2">
-                                    <span class="text-primary fw-bold fs-5">KSh {{ related_product.selling_price|floatformat:2 }}</span>
-                                    {% if related_product.discount_price %}
-                                    <span class="text-muted text-decoration-line-through ms-2">KSh {{ related_product.price|floatformat:2 }}</span>
-                                    {% endif %}
-                                </div>
-                                <small class="text-muted">{{ related_product.category.name }}</small>
-                                <div class="mt-2">
-                                    <small class="text-muted">
-                                        <i class="fas fa-map-marker-alt me-1"></i>
-                                        {{ related_product.farmer.county.name }}
-                                    </small>
-                                </div>
-                            </div>
-                        </a>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- Frequently Bought Together -->
-            {% if frequently_bought %}
-            <div class="related-products wow fadeInUp" data-wow-delay="0.9s">
-                <h3 class="mb-4">Frequently Bought Together</h3>
-                <div class="row">
-                    {% for freq_product in frequently_bought %}
-                    <div class="col-xl-3 col-lg-4 col-md-6 wow fadeInUp" data-wow-delay="{{ forloop.counter0|floatformat:1|add:"0.1" }}s">
-                        <a href="{% url 'product_detail' freq_product.slug %}" class="product-item d-block">
-                            <div class="position-relative bg-light overflow-hidden">
-                                <img src="{% if freq_product.main_image %}{{ freq_product.main_image.image.url }}{% else %}{% static 'img/product-placeholder.jpg' %}{% endif %}" 
-                                     alt="{{ freq_product.name }}" class="img-fluid">
-                                {% if freq_product.discount_percentage > 0 %}
-                                <div class="position-absolute top-0 start-0 m-3 py-1 px-3 bg-danger text-white rounded">
-                                    -{{ freq_product.discount_percentage }}%
-                                </div>
-                                {% endif %}
-                            </div>
-                            <div class="card-body text-center">
-                                <h5 class="mb-2">{{ freq_product.name }}</h5>
-                                <div class="mb-2">
-                                    <span class="text-primary fw-bold fs-5">KSh {{ freq_product.selling_price|floatformat:2 }}</span>
-                                    {% if freq_product.discount_price %}
-                                    <span class="text-muted text-decoration-line-through ms-2">KSh {{ freq_product.price|floatformat:2 }}</span>
-                                    {% endif %}
-                                </div>
-                                <small class="text-muted">{{ freq_product.category.name }}</small>
-                            </div>
-                        </a>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- Recently Viewed -->
-            {% if recently_viewed %}
-            <div class="related-products wow fadeInUp" data-wow-delay="1.1s">
-                <h3 class="mb-4">Recently Viewed</h3>
-                <div class="row">
-                    {% for recent_product in recently_viewed %}
-                    <div class="col-xl-3 col-lg-4 col-md-6 wow fadeInUp" data-wow-delay="{{ forloop.counter0|floatformat:1|add:"0.1" }}s">
-                        <a href="{% url 'product_detail' recent_product.slug %}" class="product-item d-block">
-                            <div class="position-relative bg-light overflow-hidden">
-                                <img src="{% if recent_product.main_image %}{{ recent_product.main_image.image.url }}{% else %}{% static 'img/product-placeholder.jpg' %}{% endif %}" 
-                                     alt="{{ recent_product.name }}" class="img-fluid">
-                                {% if recent_product.discount_percentage > 0 %}
-                                <div class="position-absolute top-0 start-0 m-3 py-1 px-3 bg-danger text-white rounded">
-                                    -{{ recent_product.discount_percentage }}%
-                                </div>
-                                {% endif %}
-                            </div>
-                            <div class="card-body text-center">
-                                <h5 class="mb-2">{{ recent_product.name }}</h5>
-                                <div class="mb-2">
-                                    <span class="text-primary fw-bold fs-5">KSh {{ recent_product.selling_price|floatformat:2 }}</span>
-                                    {% if recent_product.discount_price %}
-                                    <span class="text-muted text-decoration-line-through ms-2">KSh {{ recent_product.price|floatformat:2 }}</span>
-                                    {% endif %}
-                                </div>
-                                <small class="text-muted">{{ recent_product.category.name }}</small>
-                            </div>
-                        </a>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- Image Modal -->
-    <div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="imageModalLabel">{{ product.name }}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body text-center">
-                    <img id="modalImage" src="" alt="{{ product.name }}" class="img-fluid">
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Toast notification for cart actions -->
-    <div class="toast-container position-fixed bottom-0 end-0 p-3">
-        <div id="cartToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="toast-header">
-                <i class="fas fa-shopping-cart text-success me-2"></i>
-                <strong class="me-auto">Cart Update</strong>
-                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-            </div>
-            <div class="toast-body" id="toastMessage">
-                Product added to cart successfully!
-            </div>
-        </div>
-    </div>
-
-<script>
-// Quantity controls
-function increaseQuantity() {
-    const quantityInput = document.getElementById('quantity');
-    const currentValue = parseInt(quantityInput.value);
-    const maxValue = parseInt(quantityInput.max);
-    
-    if (currentValue < maxValue) {
-        quantityInput.value = currentValue + 1;
-        document.getElementById('form-quantity').value = quantityInput.value;
-    }
-}
-
-function decreaseQuantity() {
-    const quantityInput = document.getElementById('quantity');
-    const currentValue = parseInt(quantityInput.value);
-    const minValue = parseInt(quantityInput.min);
-    
-    if (currentValue > minValue) {
-        quantityInput.value = currentValue - 1;
-        document.getElementById('form-quantity').value = quantityInput.value;
-    }
-}
-
-// Update form quantity when input changes
-document.getElementById('quantity').addEventListener('input', function() {
-    document.getElementById('form-quantity').value = this.value;
-});
-
-// Image gallery functionality
-function changeMainImage(imageSrc, thumbnailElement) {
-    document.getElementById('mainProductImage').src = imageSrc;
-    
-    // Remove active class from all thumbnails
-    document.querySelectorAll('.thumbnail-img').forEach(img => {
-        img.classList.remove('active');
-    });
-    
-    // Add active class to clicked thumbnail
-    thumbnailElement.classList.add('active');
-}
-
-// Image modal
-function openImageModal(imageSrc) {
-    document.getElementById('modalImage').src = imageSrc;
-    const modal = new bootstrap.Modal(document.getElementById('imageModal'));
-    modal.show();
-}
-
-// Add to cart functionality with AJAX
-document.querySelector('form[action*="add_to_cart"]').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(this);
-    
-    fetch(this.action, {
-        method: 'POST',
-        body: formData,
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest',
-            'X-CSRFToken': formData.get('csrfmiddlewaretoken')
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        const toast = document.getElementById('cartToast');
-        const toastMessage = document.getElementById('toastMessage');
-        
-        if (data.success) {
-            toastMessage.textContent = data.message;
-            toast.classList.remove('bg-danger');
-            toast.classList.add('bg-success');
-            
-            // Update cart count if it exists
-            const cartCount = document.querySelector('.cart-count');
-            if (cartCount && data.cart_total) {
-                cartCount.textContent = data.cart_total;
-            }
-        } else {
-            toastMessage.textContent = data.message;
-            toast.classList.remove('bg-success');
-            toast.classList.add('bg-danger');
-        }
-        
-        const bsToast = new bootstrap.Toast(toast);
-        bsToast.show();
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        const toast = document.getElementById('cartToast');
-        const toastMessage = document.getElementById('toastMessage');
-        toastMessage.textContent = 'An error occurred. Please try again.';
-        toast.classList.add('bg-danger');
-        
-        const bsToast = new bootstrap.Toast(toast);
-        bsToast.show();
-    });
-});
-
-// Load more reviews functionality
-function loadMoreReviews() {
-    // Implementation for loading more reviews via AJAX
-    console.log('Loading more reviews...');
-}
-
-// Add to cart for related products
-function addToCart(productId) {
-    const formData = new FormData();
-    formData.append('product_id', productId);
-    formData.append('quantity', 1);
-    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
-    
-    fetch(`/add-to-cart/${productId}/`, {
-        method: 'POST',
-        body: formData,
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        const toast = document.getElementById('cartToast');
-        const toastMessage = document.getElementById('toastMessage');
-        
-        if (data.success) {
-            toastMessage.textContent = data.message;
-            toast.classList.remove('bg-danger');
-            toast.classList.add('bg-success');
-        } else {
-            toastMessage.textContent = data.message;
-            toast.classList.remove('bg-success');
-            toast.classList.add('bg-danger');
-        }
-        
-        const bsToast = new bootstrap.Toast(toast);
-        bsToast.show();
-    })
-    .catch(error => {
-        console.error('Error:', error);
-    });
-}
-</script>
-
-{% endblock %}
