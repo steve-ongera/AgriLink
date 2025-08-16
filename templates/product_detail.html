@@ -5,6 +5,11 @@
 
 {% block meta_description %}{{ product.short_description|default:product.description|truncatewords:30 }}{% endblock %}
 
+{% block extra_css %}
+<!-- Include cart styles -->
+{% include '_cart_scripts.html' %}
+{% endblock %}
+
 {% block content %}
 
 <style>
@@ -392,15 +397,16 @@
     margin: 50px 0;
 }
 
+/* Use product list styling for uniform appearance */
 .product-item {
-    border: 1px solid #eee;
-    border-radius: 12px;
     transition: all 0.3s ease;
     height: 100%;
     text-decoration: none;
     color: inherit;
     background: #fff;
     overflow: hidden;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
 .product-item:hover {
@@ -408,16 +414,6 @@
     box-shadow: 0 8px 25px rgba(0,0,0,0.15);
     color: inherit;
     text-decoration: none;
-}
-
-.product-item img {
-    width: 100%;
-    height: 200px;
-    object-fit: cover;
-}
-
-.product-item .card-body {
-    padding: 20px;
 }
 
 @media (max-width: 768px) {
@@ -1104,43 +1100,72 @@
             {% if related_products %}
             <div class="related-products wow fadeInUp" data-wow-delay="0.7s">
                 <h3 class="mb-4">Related Products</h3>
-                <div class="row">
+                <div class="row g-4">
                     {% for related_product in related_products %}
                     <div class="col-xl-3 col-lg-4 col-md-6 wow fadeInUp" data-wow-delay="{{ forloop.counter0|floatformat:1|add:"0.1" }}s">
-                        <a href="{% url 'product_detail' related_product.slug %}" class="product-item d-block">
+                        <div class="product-item">
                             <div class="position-relative bg-light overflow-hidden">
-                                <img src="{% if related_product.main_image %}{{ related_product.main_image.image.url }}{% else %}{% static 'img/product-placeholder.jpg' %}{% endif %}" 
-                                     alt="{{ related_product.name }}" class="img-fluid">
-                                {% if related_product.discount_percentage > 0 %}
-                                <div class="position-absolute top-0 start-0 m-3 py-1 px-3 bg-danger text-white rounded">
-                                    -{{ related_product.discount_percentage }}%
-                                </div>
+                                {% if related_product.main_image %}
+                                    <img class="img-fluid w-100" src="{{ related_product.main_image.image.url }}" alt="{{ related_product.name }}" style="height: 250px; object-fit: cover;">
+                                {% else %}
+                                    <img class="img-fluid w-100" src="{% static 'img/product-placeholder.jpg' %}" alt="{{ related_product.name }}" style="height: 250px; object-fit: cover;">
                                 {% endif %}
+                                
+                                <!-- Product badges -->
                                 {% if related_product.is_organic %}
-                                <div class="position-absolute top-0 end-0 m-3">
-                                    <span class="badge bg-success">
-                                        <i class="fas fa-leaf me-1"></i>Organic
-                                    </span>
-                                </div>
+                                    <div class="bg-success rounded text-white position-absolute start-0 top-0 m-4 py-1 px-3">Organic</div>
+                                {% elif related_product.is_featured %}
+                                    <div class="bg-primary rounded text-white position-absolute start-0 top-0 m-4 py-1 px-3">Featured</div>
+                                {% endif %}
+
+                                <!-- Discount badge -->
+                                {% if related_product.discount_percentage > 0 %}
+                                    <div class="bg-danger rounded text-white position-absolute end-0 top-0 m-4 py-1 px-3">-{{ related_product.discount_percentage }}%</div>
                                 {% endif %}
                             </div>
-                            <div class="card-body text-center">
-                                <h5 class="mb-2">{{ related_product.name }}</h5>
+                            <div class="text-center p-4">
+                                <a class="d-block h5 mb-2" href="{% url 'product_detail' related_product.slug %}">{{ related_product.name }}</a>
                                 <div class="mb-2">
-                                    <span class="text-primary fw-bold fs-5">KSh {{ related_product.selling_price|floatformat:2 }}</span>
+                                    <span class="text-primary me-1 fw-bold">KSh {{ related_product.selling_price|floatformat:2 }}</span>
                                     {% if related_product.discount_price %}
-                                    <span class="text-muted text-decoration-line-through ms-2">KSh {{ related_product.price|floatformat:2 }}</span>
+                                        <span class="text-body text-decoration-line-through">KSh {{ related_product.price|floatformat:2 }}</span>
                                     {% endif %}
                                 </div>
-                                <small class="text-muted">{{ related_product.category.name }}</small>
+                                <div class="mt-2">
+                                    <small class="text-muted">{{ related_product.get_unit_display|upper }}</small>
+                                    {% if related_product.subcategory %}
+                                    <small class="text-muted"> | {{ related_product.subcategory.name }}</small>
+                                    {% endif %}
+                                    <small class="text-muted"> | {{ related_product.farmer.farm_name }}</small>
+                                </div>
+                                {% if related_product.short_description %}
+                                <p class="text-muted small mt-2">{{ related_product.short_description|truncatechars:80 }}</p>
+                                {% endif %}
                                 <div class="mt-2">
                                     <small class="text-muted">
-                                        <i class="fas fa-map-marker-alt me-1"></i>
-                                        {{ related_product.farmer.county.name }}
+                                        <i class="fas fa-map-marker-alt"></i> {{ related_product.farmer.county.name }}
                                     </small>
                                 </div>
                             </div>
-                        </a>
+                            <div class="d-flex border-top">
+                                <small class="w-50 text-center border-end py-2">
+                                    <a class="text-body" href="{% url 'product_detail' related_product.slug %}">
+                                        <i class="fa fa-eye text-primary me-2"></i>View Detail
+                                    </a>
+                                </small>
+                                <small class="w-50 text-center py-2">
+                                    {% if related_product.is_in_stock %}
+                                        <a class="text-body" href="#" onclick="addToCart({{ related_product.id }})">
+                                            <i class="fa fa-shopping-bag text-primary me-2"></i>Add to Cart
+                                        </a>
+                                    {% else %}
+                                        <span class="text-muted">
+                                            <i class="fa fa-ban text-muted me-2"></i>Out of Stock
+                                        </span>
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
                     </div>
                     {% endfor %}
                 </div>
@@ -1151,30 +1176,72 @@
             {% if frequently_bought %}
             <div class="related-products wow fadeInUp" data-wow-delay="0.9s">
                 <h3 class="mb-4">Frequently Bought Together</h3>
-                <div class="row">
+                <div class="row g-4">
                     {% for freq_product in frequently_bought %}
                     <div class="col-xl-3 col-lg-4 col-md-6 wow fadeInUp" data-wow-delay="{{ forloop.counter0|floatformat:1|add:"0.1" }}s">
-                        <a href="{% url 'product_detail' freq_product.slug %}" class="product-item d-block">
+                        <div class="product-item">
                             <div class="position-relative bg-light overflow-hidden">
-                                <img src="{% if freq_product.main_image %}{{ freq_product.main_image.image.url }}{% else %}{% static 'img/product-placeholder.jpg' %}{% endif %}" 
-                                     alt="{{ freq_product.name }}" class="img-fluid">
+                                {% if freq_product.main_image %}
+                                    <img class="img-fluid w-100" src="{{ freq_product.main_image.image.url }}" alt="{{ freq_product.name }}" style="height: 250px; object-fit: cover;">
+                                {% else %}
+                                    <img class="img-fluid w-100" src="{% static 'img/product-placeholder.jpg' %}" alt="{{ freq_product.name }}" style="height: 250px; object-fit: cover;">
+                                {% endif %}
+                                
+                                <!-- Product badges -->
+                                {% if freq_product.is_organic %}
+                                    <div class="bg-success rounded text-white position-absolute start-0 top-0 m-4 py-1 px-3">Organic</div>
+                                {% elif freq_product.is_featured %}
+                                    <div class="bg-primary rounded text-white position-absolute start-0 top-0 m-4 py-1 px-3">Featured</div>
+                                {% endif %}
+
+                                <!-- Discount badge -->
                                 {% if freq_product.discount_percentage > 0 %}
-                                <div class="position-absolute top-0 start-0 m-3 py-1 px-3 bg-danger text-white rounded">
-                                    -{{ freq_product.discount_percentage }}%
-                                </div>
+                                    <div class="bg-danger rounded text-white position-absolute end-0 top-0 m-4 py-1 px-3">-{{ freq_product.discount_percentage }}%</div>
                                 {% endif %}
                             </div>
-                            <div class="card-body text-center">
-                                <h5 class="mb-2">{{ freq_product.name }}</h5>
+                            <div class="text-center p-4">
+                                <a class="d-block h5 mb-2" href="{% url 'product_detail' freq_product.slug %}">{{ freq_product.name }}</a>
                                 <div class="mb-2">
-                                    <span class="text-primary fw-bold fs-5">KSh {{ freq_product.selling_price|floatformat:2 }}</span>
+                                    <span class="text-primary me-1 fw-bold">KSh {{ freq_product.selling_price|floatformat:2 }}</span>
                                     {% if freq_product.discount_price %}
-                                    <span class="text-muted text-decoration-line-through ms-2">KSh {{ freq_product.price|floatformat:2 }}</span>
+                                        <span class="text-body text-decoration-line-through">KSh {{ freq_product.price|floatformat:2 }}</span>
                                     {% endif %}
                                 </div>
-                                <small class="text-muted">{{ freq_product.category.name }}</small>
+                                <div class="mt-2">
+                                    <small class="text-muted">{{ freq_product.get_unit_display|upper }}</small>
+                                    {% if freq_product.subcategory %}
+                                    <small class="text-muted"> | {{ freq_product.subcategory.name }}</small>
+                                    {% endif %}
+                                    <small class="text-muted"> | {{ freq_product.farmer.farm_name }}</small>
+                                </div>
+                                {% if freq_product.short_description %}
+                                <p class="text-muted small mt-2">{{ freq_product.short_description|truncatechars:80 }}</p>
+                                {% endif %}
+                                <div class="mt-2">
+                                    <small class="text-muted">
+                                        <i class="fas fa-map-marker-alt"></i> {{ freq_product.farmer.county.name }}
+                                    </small>
+                                </div>
                             </div>
-                        </a>
+                            <div class="d-flex border-top">
+                                <small class="w-50 text-center border-end py-2">
+                                    <a class="text-body" href="{% url 'product_detail' freq_product.slug %}">
+                                        <i class="fa fa-eye text-primary me-2"></i>View Detail
+                                    </a>
+                                </small>
+                                <small class="w-50 text-center py-2">
+                                    {% if freq_product.is_in_stock %}
+                                        <a class="text-body" href="#" onclick="addToCart({{ freq_product.id }})">
+                                            <i class="fa fa-shopping-bag text-primary me-2"></i>Add to Cart
+                                        </a>
+                                    {% else %}
+                                        <span class="text-muted">
+                                            <i class="fa fa-ban text-muted me-2"></i>Out of Stock
+                                        </span>
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
                     </div>
                     {% endfor %}
                 </div>
@@ -1185,30 +1252,72 @@
             {% if recently_viewed %}
             <div class="related-products wow fadeInUp" data-wow-delay="1.1s">
                 <h3 class="mb-4">Recently Viewed</h3>
-                <div class="row">
+                <div class="row g-4">
                     {% for recent_product in recently_viewed %}
                     <div class="col-xl-3 col-lg-4 col-md-6 wow fadeInUp" data-wow-delay="{{ forloop.counter0|floatformat:1|add:"0.1" }}s">
-                        <a href="{% url 'product_detail' recent_product.slug %}" class="product-item d-block">
+                        <div class="product-item">
                             <div class="position-relative bg-light overflow-hidden">
-                                <img src="{% if recent_product.main_image %}{{ recent_product.main_image.image.url }}{% else %}{% static 'img/product-placeholder.jpg' %}{% endif %}" 
-                                     alt="{{ recent_product.name }}" class="img-fluid">
+                                {% if recent_product.main_image %}
+                                    <img class="img-fluid w-100" src="{{ recent_product.main_image.image.url }}" alt="{{ recent_product.name }}" style="height: 250px; object-fit: cover;">
+                                {% else %}
+                                    <img class="img-fluid w-100" src="{% static 'img/product-placeholder.jpg' %}" alt="{{ recent_product.name }}" style="height: 250px; object-fit: cover;">
+                                {% endif %}
+                                
+                                <!-- Product badges -->
+                                {% if recent_product.is_organic %}
+                                    <div class="bg-success rounded text-white position-absolute start-0 top-0 m-4 py-1 px-3">Organic</div>
+                                {% elif recent_product.is_featured %}
+                                    <div class="bg-primary rounded text-white position-absolute start-0 top-0 m-4 py-1 px-3">Featured</div>
+                                {% endif %}
+
+                                <!-- Discount badge -->
                                 {% if recent_product.discount_percentage > 0 %}
-                                <div class="position-absolute top-0 start-0 m-3 py-1 px-3 bg-danger text-white rounded">
-                                    -{{ recent_product.discount_percentage }}%
-                                </div>
+                                    <div class="bg-danger rounded text-white position-absolute end-0 top-0 m-4 py-1 px-3">-{{ recent_product.discount_percentage }}%</div>
                                 {% endif %}
                             </div>
-                            <div class="card-body text-center">
-                                <h5 class="mb-2">{{ recent_product.name }}</h5>
+                            <div class="text-center p-4">
+                                <a class="d-block h5 mb-2" href="{% url 'product_detail' recent_product.slug %}">{{ recent_product.name }}</a>
                                 <div class="mb-2">
-                                    <span class="text-primary fw-bold fs-5">KSh {{ recent_product.selling_price|floatformat:2 }}</span>
+                                    <span class="text-primary me-1 fw-bold">KSh {{ recent_product.selling_price|floatformat:2 }}</span>
                                     {% if recent_product.discount_price %}
-                                    <span class="text-muted text-decoration-line-through ms-2">KSh {{ recent_product.price|floatformat:2 }}</span>
+                                        <span class="text-body text-decoration-line-through">KSh {{ recent_product.price|floatformat:2 }}</span>
                                     {% endif %}
                                 </div>
-                                <small class="text-muted">{{ recent_product.category.name }}</small>
+                                <div class="mt-2">
+                                    <small class="text-muted">{{ recent_product.get_unit_display|upper }}</small>
+                                    {% if recent_product.subcategory %}
+                                    <small class="text-muted"> | {{ recent_product.subcategory.name }}</small>
+                                    {% endif %}
+                                    <small class="text-muted"> | {{ recent_product.farmer.farm_name }}</small>
+                                </div>
+                                {% if recent_product.short_description %}
+                                <p class="text-muted small mt-2">{{ recent_product.short_description|truncatechars:80 }}</p>
+                                {% endif %}
+                                <div class="mt-2">
+                                    <small class="text-muted">
+                                        <i class="fas fa-map-marker-alt"></i> {{ recent_product.farmer.county.name }}
+                                    </small>
+                                </div>
                             </div>
-                        </a>
+                            <div class="d-flex border-top">
+                                <small class="w-50 text-center border-end py-2">
+                                    <a class="text-body" href="{% url 'product_detail' recent_product.slug %}">
+                                        <i class="fa fa-eye text-primary me-2"></i>View Detail
+                                    </a>
+                                </small>
+                                <small class="w-50 text-center py-2">
+                                    {% if recent_product.is_in_stock %}
+                                        <a class="text-body" href="#" onclick="addToCart({{ recent_product.id }})">
+                                            <i class="fa fa-shopping-bag text-primary me-2"></i>Add to Cart
+                                        </a>
+                                    {% else %}
+                                        <span class="text-muted">
+                                            <i class="fa fa-ban text-muted me-2"></i>Out of Stock
+                                        </span>
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
                     </div>
                     {% endfor %}
                 </div>

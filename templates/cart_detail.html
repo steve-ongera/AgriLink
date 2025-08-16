@@ -1,0 +1,344 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Shopping Cart{% endblock %}
+
+{% block content %}
+<!-- Page Header Start -->
+<div class="container-fluid page-header mb-5 wow fadeIn" data-wow-delay="0.1s">
+    <div class="container">
+        <h1 class="display-3 mb-3 animated slideInDown">Shopping Cart</h1>
+        <nav aria-label="breadcrumb animated slideInDown">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a class="text-body" href="{% url 'home' %}">Home</a></li>
+                <li class="breadcrumb-item text-dark active" aria-current="page">Cart</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+<!-- Page Header End -->
+
+<!-- Cart Content Start -->
+<div class="container-xxl py-5">
+    <div class="container">
+        {% if cart_items %}
+        <div class="row">
+            <!-- Cart Items -->
+            <div class="col-lg-8">
+                <div class="bg-light rounded p-4 mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h4 class="mb-0">Cart Items ({{ cart.total_items }})</h4>
+                        <button type="button" class="btn btn-outline-danger btn-sm" onclick="clearCart()">
+                            <i class="fas fa-trash"></i> Clear Cart
+                        </button>
+                    </div>
+
+                    <!-- Group by Farmers -->
+                    {% for farmer_id, farmer_data in farmers_items.items %}
+                    <div class="farmer-group mb-4 p-3 border rounded">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="me-3">
+                                <i class="fas fa-user-tie fa-2x text-success"></i>
+                            </div>
+                            <div>
+                                <h5 class="mb-1">{{ farmer_data.farmer.farm_name }}</h5>
+                                <small class="text-muted">
+                                    <i class="fas fa-map-marker-alt"></i> {{ farmer_data.farmer.full_address }}
+                                </small>
+                                {% if farmer_data.farmer.is_verified %}
+                                <span class="badge bg-success ms-2">Verified</span>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Farmer's Products -->
+                        {% for item in farmer_data.items %}
+                        <div class="cart-item d-flex align-items-center p-3 mb-3 bg-white rounded border" data-item-id="{{ item.id }}">
+                            <div class="me-3">
+                                {% if item.product.images.exists %}
+                                    <img src="{{ item.product.images.first.image.url }}" alt="{{ item.product.name }}" 
+                                         class="rounded" style="width: 80px; height: 80px; object-fit: cover;">
+                                {% else %}
+                                    <div class="bg-secondary rounded d-flex align-items-center justify-content-center" 
+                                         style="width: 80px; height: 80px;">
+                                        <i class="fas fa-image text-white"></i>
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1">{{ item.product.name }}</h6>
+                                <p class="mb-1 text-muted small">{{ item.product.category.name }} - {{ item.product.quality_grade|capfirst }}</p>
+                                <div class="d-flex align-items-center">
+                                    <span class="text-primary fw-bold">KES {{ item.product.selling_price }}</span>
+                                    <span class="text-muted ms-2">per {{ item.product.unit|upper }}</span>
+                                    {% if item.product.discount_price %}
+                                    <span class="text-decoration-line-through text-muted ms-2">KES {{ item.product.price }}</span>
+                                    {% endif %}
+                                </div>
+                                {% if item.product.available_quantity %}
+                                <small class="text-success">{{ item.product.available_quantity }} {{ item.product.unit }} available</small>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="quantity-controls me-3">
+                                <div class="input-group" style="width: 120px;">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="updateQuantity({{ item.id }}, 'decrease')">
+                                        <i class="fas fa-minus"></i>
+                                    </button>
+                                    <input type="number" class="form-control text-center quantity-input" 
+                                           value="{{ item.quantity }}" min="{{ item.product.minimum_order }}" 
+                                           data-item-id="{{ item.id }}" onchange="updateQuantityInput(this)">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="updateQuantity({{ item.id }}, 'increase')">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                </div>
+                                <small class="text-muted">Min: {{ item.product.minimum_order }}</small>
+                            </div>
+                            
+                            <div class="text-end me-3">
+                                <div class="fw-bold item-total">KES {{ item.total_price }}</div>
+                                <small class="text-muted">{{ item.quantity }} {{ item.product.unit }}</small>
+                            </div>
+                            
+                            <button type="button" class="btn btn-outline-danger btn-sm" 
+                                    onclick="removeItem({{ item.id }})" title="Remove item">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                        {% endfor %}
+                        
+                        <div class="text-end">
+                            <strong>Farmer Total: KES {{ farmer_data.subtotal }}</strong>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Cart Summary -->
+            <div class="col-lg-4">
+                <div class="bg-light rounded p-4 position-sticky" style="top: 100px;">
+                    <h4 class="mb-4">Order Summary</h4>
+                    
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Subtotal ({{ cart.total_items }} items)</span>
+                        <span class="cart-subtotal">KES {{ subtotal }}</span>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Estimated Delivery Fee</span>
+                        <span class="delivery-fee">KES {{ delivery_fee_estimate }}</span>
+                    </div>
+                    {% if total_farmers > 1 %}
+                    <small class="text-muted mb-3 d-block">
+                        Multiple farmers delivery fee included ({{ total_farmers }} pickup points)
+                    </small>
+                    {% endif %}
+                    
+                    <hr>
+                    <div class="d-flex justify-content-between mb-4">
+                        <strong>Estimated Total</strong>
+                        <strong class="estimated-total">KES {{ total_estimate }}</strong>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        {% if user.is_authenticated %}
+                            <a href="{% url 'checkout' %}" class="btn btn-success btn-lg">
+                                <i class="fas fa-credit-card me-2"></i>Proceed to Checkout
+                            </a>
+                        {% else %}
+                            <a href="{% url 'login' %}?next={% url 'checkout' %}" class="btn btn-success btn-lg">
+                                <i class="fas fa-sign-in-alt me-2"></i>Login to Checkout
+                            </a>
+                        {% endif %}
+                        <a href="{% url 'product_list' %}" class="btn btn-outline-primary">
+                            <i class="fas fa-arrow-left me-2"></i>Continue Shopping
+                        </a>
+                    </div>
+                    
+                    <div class="mt-4 p-3 bg-white rounded">
+                        <h6 class="mb-2">Delivery Information</h6>
+                        <ul class="list-unstyled small mb-0">
+                            <li><i class="fas fa-check-circle text-success me-2"></i>Free delivery above KES 2,000</li>
+                            <li><i class="fas fa-clock text-info me-2"></i>Delivery within 24-48 hours</li>
+                            <li><i class="fas fa-shield-alt text-primary me-2"></i>Fresh products guaranteed</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <!-- Empty Cart -->
+        <div class="text-center py-5">
+            <i class="fas fa-shopping-cart fa-4x text-muted mb-4"></i>
+            <h3>Your cart is empty</h3>
+            <p class="text-muted mb-4">Looks like you haven't added any items to your cart yet.</p>
+            <a href="{% url 'product_list' %}" class="btn btn-success btn-lg">
+                <i class="fas fa-shopping-basket me-2"></i>Start Shopping
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+<!-- Cart Content End -->
+
+<script>
+// CSRF token for AJAX requests
+const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+// Update quantity via + / - buttons
+function updateQuantity(itemId, action) {
+    const quantityInput = document.querySelector(`input[data-item-id="${itemId}"]`);
+    let currentQuantity = parseFloat(quantityInput.value);
+    const minQuantity = parseFloat(quantityInput.min);
+    
+    if (action === 'increase') {
+        currentQuantity += (minQuantity || 1);
+    } else if (action === 'decrease' && currentQuantity > minQuantity) {
+        currentQuantity -= (minQuantity || 1);
+    }
+    
+    quantityInput.value = currentQuantity;
+    updateCartItem(itemId, currentQuantity);
+}
+
+// Update quantity via input field
+function updateQuantityInput(input) {
+    const itemId = input.getAttribute('data-item-id');
+    const quantity = parseFloat(input.value);
+    updateCartItem(itemId, quantity);
+}
+
+// AJAX call to update cart item
+function updateCartItem(itemId, quantity) {
+    fetch('{% url "update_cart_item" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrftoken
+        },
+        body: JSON.stringify({
+            item_id: itemId,
+            quantity: quantity
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update item total
+            const cartItem = document.querySelector(`[data-item-id="${itemId}"]`);
+            cartItem.querySelector('.item-total').textContent = `KES ${data.item_total}`;
+            
+            // Update cart totals
+            document.querySelector('.cart-subtotal').textContent = `KES ${data.cart_total}`;
+            document.querySelector('.delivery-fee').textContent = `KES ${data.delivery_estimate}`;
+            document.querySelector('.estimated-total').textContent = `KES ${(data.cart_total + data.delivery_estimate).toFixed(2)}`;
+            
+            // Update cart count in header if exists
+            const cartCount = document.querySelector('.cart-count');
+            if (cartCount) {
+                cartCount.textContent = data.cart_count;
+            }
+        } else {
+            alert(data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error updating cart item');
+    });
+}
+
+// Remove item from cart
+function removeItem(itemId) {
+    if (confirm('Are you sure you want to remove this item from your cart?')) {
+        fetch(`/cart/remove/${itemId}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Remove the item from DOM
+                const cartItem = document.querySelector(`[data-item-id="${itemId}"]`);
+                cartItem.remove();
+                
+                // Update totals
+                document.querySelector('.cart-subtotal').textContent = `KES ${data.cart_total}`;
+                
+                // Update cart count in header if exists
+                const cartCount = document.querySelector('.cart-count');
+                if (cartCount) {
+                    cartCount.textContent = data.cart_count;
+                }
+                
+                // Reload page if cart is empty
+                if (data.cart_count === 0) {
+                    location.reload();
+                }
+                
+                // Show success message
+                showMessage(data.message, 'success');
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error removing item from cart');
+        });
+    }
+}
+
+// Clear entire cart
+function clearCart() {
+    if (confirm('Are you sure you want to clear your entire cart?')) {
+        fetch('{% url "clear_cart" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error clearing cart');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error clearing cart');
+        });
+    }
+}
+
+// Show message function
+function showMessage(message, type = 'info') {
+    // Create toast/alert element
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show position-fixed`;
+    alert.style.cssText = 'top: 20px; right: 20px; z-index: 1050; min-width: 300px;';
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(alert);
+    
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.remove();
+        }
+    }, 5000);
+}
+</script>
+
+{% endblock %}

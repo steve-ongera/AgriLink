@@ -871,7 +871,7 @@ def cart_detail(request):
         'total_farmers': len(farmers_items),
     }
     
-    return render(request, 'cart/cart_detail.html', context)
+    return render(request, 'cart_detail.html', context)
 
 
 @require_http_methods(["POST"])
@@ -1015,7 +1015,7 @@ def checkout(request):
         'counties': counties,
     }
     
-    return render(request, 'cart/checkout.html', context)
+    return render(request, 'checkout.html', context)
 
 
 @login_required
@@ -1123,3 +1123,6 @@ def cart_count(request):
     """Return current cart count for AJAX requests"""
     cart = get_or_create_cart(request)
     return JsonResponse({'cart_count': cart.total_items})
+
+
+

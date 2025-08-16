@@ -1,0 +1,166 @@
+{% load static %}
+
+<!-- Cart JavaScript and Styles -->
+<script src="{% static 'js/cart.js' %}"></script>
+
+<!-- Additional cart styles -->
+<style>
+.cart-notification {
+    animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.btn-add-cart:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.cart-count {
+    transition: transform 0.2s ease;
+}
+
+.quantity-controls .btn {
+    border-radius: 0;
+}
+
+.quantity-controls .btn:first-child {
+    border-top-left-radius: 0.375rem;
+    border-bottom-left-radius: 0.375rem;
+}
+
+.quantity-controls .btn:last-child {
+    border-top-right-radius: 0.375rem;
+    border-bottom-right-radius: 0.375rem;
+}
+
+.farmer-group {
+    border-left: 4px solid #28a745;
+}
+
+.cart-item:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: box-shadow 0.2s ease;
+}
+
+@media (max-width: 768px) {
+    .cart-notification {
+        left: 10px;
+        right: 10px;
+        min-width: auto;
+        max-width: none;
+    }
+}
+</style>
+
+<!-- Cart functionality that can be used in templates -->
+<script>
+// Updated addToCart function that works with both AJAX and form submissions
+function addToCart(productId, quantity) {
+    // If quantity is not provided, try to get it from the current context
+    if (quantity === undefined || quantity === null) {
+        // Look for quantity input in the current form or page
+        const quantityInputs = [
+            document.querySelector('#form-quantity'),
+            document.querySelector(`#quantity-${productId}`),
+            document.querySelector('[name="quantity"]'),
+            document.querySelector('#quantity')
+        ];
+        
+        for (let input of quantityInputs) {
+            if (input && input.value) {
+                quantity = parseFloat(input.value);
+                break;
+            }
+        }
+        
+        // Default to 1 if still no quantity found
+        if (!quantity || quantity < 1) {
+            quantity = 1;
+        }
+    }
+    
+    // Call the main addToCart function from cart.js
+    if (window.addToCart) {
+        window.addToCart(productId, quantity);
+    } else {
+        console.error('Cart functionality not loaded');
+    }
+}
+
+// Handle quantity selector updates for product detail pages
+function updateProductQuantity(productId, action) {
+    const quantityInput = document.querySelector('#form-quantity, #quantity, [name="quantity"]');
+    if (!quantityInput) return;
+    
+    const current = parseFloat(quantityInput.value) || 1;
+    const min = parseFloat(quantityInput.getAttribute('min')) || 1;
+    const step = parseFloat(quantityInput.getAttribute('step')) || 1;
+    
+    let newValue = current;
+    if (action === 'increase') {
+        newValue = current + step;
+    } else if (action === 'decrease' && current > min) {
+        newValue = Math.max(current - step, min);
+    }
+    
+    quantityInput.value = newValue;
+    
+    // Update any display elements
+    const quantityDisplay = document.querySelector('.quantity-display');
+    if (quantityDisplay) {
+        quantityDisplay.textContent = newValue;
+    }
+}
+
+// Auto-initialize cart functionality for common elements
+document.addEventListener('DOMContentLoaded', function() {
+    // Add click handlers for quantity buttons
+    document.querySelectorAll('[data-quantity-action]').forEach(button => {
+        button.addEventListener('click', function() {
+            const action = this.getAttribute('data-quantity-action');
+            const productId = this.getAttribute('data-product-id');
+            updateProductQuantity(productId, action);
+        });
+    });
+    
+    // Add form validation for add to cart forms
+    document.querySelectorAll('.add-to-cart-form').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const productId = this.querySelector('[name="product_id"]').value;
+            const quantity = this.querySelector('[name="quantity"]').value;
+            
+            if (!productId) {
+                alert('Product ID is required');
+                return;
+            }
+            
+            addToCart(parseInt(productId), parseFloat(quantity));
+        });
+    });
+    
+    // Initialize quantity inputs with proper validation
+    document.querySelectorAll('input[name="quantity"]').forEach(input => {
+        input.addEventListener('change', function() {
+            const min = parseFloat(this.getAttribute('min')) || 1;
+            const value = parseFloat(this.value);
+            
+            if (value < min) {
+                this.value = min;
+                showNotification(`Minimum quantity is ${min}`, 'warning', 3000);
+            }
+        });
+    });
+});
+</script>
