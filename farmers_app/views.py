@@ -343,64 +343,214 @@ def add_to_cart(request, product_id):
 
 def product_list(request):
     """
-    Product listing page with filters
+    Product listing page with comprehensive filters and sorting
     """
+    # Base queryset
     products = Product.objects.filter(is_active=True).select_related(
-        'category', 'subcategory', 'farmer'
+        'category', 'subcategory', 'farmer__user'
     ).prefetch_related('images')
     
-    # Apply filters
-    category_slug = request.GET.get('category')
-    if category_slug:
-        products = products.filter(category__slug=category_slug)
+    # Initialize filter tracking
+    has_filters = False
     
-    subcategory_slug = request.GET.get('subcategory')
-    if subcategory_slug:
-        products = products.filter(subcategory__slug=subcategory_slug)
-    
-    search = request.GET.get('search')
-    if search:
+    # Search filter
+    search_query = request.GET.get('q', '').strip()
+    if search_query:
         products = products.filter(
-            Q(name__icontains=search) |
-            Q(description__icontains=search) |
-            Q(category__name__icontains=search)
+            Q(name__icontains=search_query) |
+            Q(description__icontains=search_query) |
+            Q(short_description__icontains=search_query) |
+            Q(category__name__icontains=search_query) |
+            Q(subcategory__name__icontains=search_query) |
+            Q(farmer__farm_name__icontains=search_query) |
+            Q(variety__icontains=search_query)
         )
+        has_filters = True
     
+    # Category filter
+    current_category = request.GET.get('category')
+    if current_category:
+        products = products.filter(category__slug=current_category)
+        has_filters = True
+    
+    # Subcategory filter
+    current_subcategory = request.GET.get('subcategory')
+    if current_subcategory:
+        products = products.filter(subcategory__slug=current_subcategory)
+        has_filters = True
+    
+    # Price range filter
+    min_price = request.GET.get('min_price')
+    max_price = request.GET.get('max_price')
+    if min_price:
+        try:
+            min_price = Decimal(min_price)
+            products = products.filter(
+                Q(discount_price__gte=min_price, discount_price__isnull=False) |
+                Q(price__gte=min_price, discount_price__isnull=True)
+            )
+            has_filters = True
+        except (ValueError, TypeError):
+            min_price = None
+    
+    if max_price:
+        try:
+            max_price = Decimal(max_price)
+            products = products.filter(
+                Q(discount_price__lte=max_price, discount_price__isnull=False) |
+                Q(price__lte=max_price, discount_price__isnull=True)
+            )
+            has_filters = True
+        except (ValueError, TypeError):
+            max_price = None
+    
+    # Stock status filter
+    stock_status = request.GET.get('stock_status')
+    if stock_status:
+        products = products.filter(stock_status=stock_status)
+        has_filters = True
+    
+    # Featured products filter
     featured = request.GET.get('featured')
     if featured:
         products = products.filter(is_featured=True)
+        has_filters = True
     
-    # Sort products
+    # Organic products filter
+    organic = request.GET.get('organic')
+    if organic:
+        products = products.filter(is_organic=True)
+        has_filters = True
+    
+    # Quality grade filter
+    quality_grade = request.GET.get('quality_grade')
+    if quality_grade:
+        products = products.filter(quality_grade=quality_grade)
+        has_filters = True
+    
+    # Farming method filter
+    farming_method = request.GET.get('farming_method')
+    if farming_method:
+        products = products.filter(farming_method__icontains=farming_method)
+        has_filters = True
+    
+    # County filter (farmer location)
+    county = request.GET.get('county')
+    if county:
+        products = products.filter(farmer__county__slug=county)
+        has_filters = True
+    
+    # Sorting
     sort_by = request.GET.get('sort', '-created_at')
-    products = products.order_by(sort_by)
+    sort_options = [
+        ('-created_at', 'Newest First'),
+        ('created_at', 'Oldest First'),
+        ('name', 'Name A-Z'),
+        ('-name', 'Name Z-A'),
+        ('price', 'Price Low to High'),
+        ('-price', 'Price High to Low'),
+        ('-view_count', 'Most Popular'),
+        ('-total_sold', 'Best Selling'),
+        ('available_quantity', 'Stock Low to High'),
+        ('-available_quantity', 'Stock High to Low'),
+    ]
+    
+    # Apply sorting
+    if sort_by == 'price':
+        # Sort by actual selling price (considering discounts)
+        products = products.extra(
+            select={
+                'selling_price': 'CASE WHEN discount_price IS NOT NULL AND discount_price < price THEN discount_price ELSE price END'
+            }
+        ).order_by('selling_price')
+    elif sort_by == '-price':
+        products = products.extra(
+            select={
+                'selling_price': 'CASE WHEN discount_price IS NOT NULL AND discount_price < price THEN discount_price ELSE price END'
+            }
+        ).order_by('-selling_price')
+    else:
+        products = products.order_by(sort_by)
+    
+    # Pagination
+    items_per_page = int(request.GET.get('per_page', 12))
+    per_page_options = [8, 12, 16, 24, 36]
+    if items_per_page not in per_page_options:
+        items_per_page = 12
+    
+    paginator = Paginator(products, items_per_page)
+    page = request.GET.get('page')
+    page_obj = paginator.get_page(page)
     
     # Add main_image to products
-    for product in products:
+    for product in page_obj:
         main_image = product.images.filter(is_main=True).first()
         if not main_image:
             main_image = product.images.first()
         product.main_image = main_image
     
-    # Pagination
-    paginator = Paginator(products, 12)
-    page = request.GET.get('page')
-    products = paginator.get_page(page)
-    
-    # Get categories for sidebar
+    # Get filter options
+    # Categories with product count
     categories = Category.objects.filter(is_active=True).annotate(
         product_count=Count('products', filter=Q(products__is_active=True))
-    )
+    ).order_by('sort_order', 'name')
+    
+    # Subcategories for current category
+    subcategories = []
+    if current_category:
+        try:
+            category = Category.objects.get(slug=current_category)
+            subcategories = category.subcategories.filter(is_active=True).annotate(
+                product_count=Count('products', filter=Q(products__is_active=True))
+            ).order_by('name')
+        except Category.DoesNotExist:
+            pass
+    
+    # Counties with farmer count
+    counties = County.objects.annotate(
+        farmer_count=Count('farmerprofile', filter=Q(farmerprofile__is_active=True))
+    ).filter(farmer_count__gt=0).order_by('name')
+    
+    # Stock status choices
+    stock_status_choices = Product.STOCK_STATUS_CHOICES
+    
+    # Quality grade choices
+    quality_grade_choices = Product.QUALITY_GRADE_CHOICES
+    
+    # Get unique farming methods
+    farming_methods = Product.objects.filter(
+        is_active=True, 
+        farming_method__isnull=False
+    ).exclude(farming_method='').values_list('farming_method', flat=True).distinct()
     
     context = {
-        'products': products,
+        'page_obj': page_obj,
         'categories': categories,
-        'current_category': category_slug,
-        'current_subcategory': subcategory_slug,
-        'search_query': search,
+        'subcategories': subcategories,
+        'counties': counties,
+        'stock_status_choices': stock_status_choices,
+        'quality_grade_choices': quality_grade_choices,
+        'farming_methods': farming_methods,
+        'sort_options': sort_options,
+        'per_page_options': per_page_options,
+        
+        # Current filter values
+        'search_query': search_query,
+        'current_category': current_category,
+        'current_subcategory': current_subcategory,
+        'min_price': min_price,
+        'max_price': max_price,
+        'stock_status': stock_status,
+        'county': county,
+        'quality_grade': quality_grade,
+        'farming_method': farming_method,
+        'sort_by': sort_by,
+        'items_per_page': items_per_page,
+        'has_filters': has_filters,
+        'total_products': paginator.count,
     }
     
     return render(request, 'product_list.html', context)
-
 
 def category_products(request, slug):
     """
