@@ -583,7 +583,7 @@
                 <div class="text-white">
                     <h3 class="mb-3">Stay Updated with Fresh Deals!</h3>
                     <p class="mb-4">Subscribe to get notifications about new products, special offers, and farming tips.</p>
-                    <form class="row g-3 justify-content-center" method="post" action="{% url 'newsletter_subscribe' %}">
+                    <form class="row g-3 justify-content-center" method="post" action="#">
                         {% csrf_token %}
                         <div class="col-md-6">
                             <input type="email" name="email" class="form-control form-control-lg" placeholder="Enter your email" required>
@@ -831,7 +831,7 @@ if ('IntersectionObserver' in window) {
 
 // Newsletter form submission
 document.addEventListener('DOMContentLoaded', function() {
-    const newsletterForm = document.querySelector('form[action="{% url 'newsletter_subscribe' %}"]');
+    const newsletterForm = document.querySelector('form[action="#"]');
     if (newsletterForm) {
         newsletterForm.addEventListener('submit', async function(e) {
             e.preventDefault();
