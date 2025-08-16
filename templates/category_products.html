@@ -71,39 +71,33 @@
                         </div>
                         {% endif %}
 
-                        <!-- Brands -->
-                        {% if brands %}
+                        <!-- Quality Grade -->
                         <div class="mb-4">
-                            <label class="form-label fw-bold">Brand</label>
-                            <select name="brand" class="form-select">
-                                <option value="">All Brands</option>
-                                {% for brand in brands %}
-                                <option value="{{ brand.slug }}" {% if current_brand == brand.slug %}selected{% endif %}>
-                                    {{ brand.name }} ({{ brand.product_count }})
+                            <label class="form-label fw-bold">Quality Grade</label>
+                            <select name="quality_grade" class="form-select">
+                                <option value="">All Quality Grades</option>
+                                {% for grade_value, grade_label in quality_grade_choices %}
+                                <option value="{{ grade_value }}" {% if quality_grade == grade_value %}selected{% endif %}>
+                                    {{ grade_label }}
                                 </option>
                                 {% endfor %}
                             </select>
                         </div>
-                        {% endif %}
 
-                        <!-- Tags -->
-                        {% if tags %}
+                        <!-- Farming Method -->
                         <div class="mb-4">
-                            <label class="form-label fw-bold">Tags</label>
-                            <select name="tag" class="form-select">
-                                <option value="">All Tags</option>
-                                {% for tag in tags %}
-                                <option value="{{ tag.slug }}" {% if current_tag == tag.slug %}selected{% endif %}>
-                                    {{ tag.name }} ({{ tag.product_count }})
-                                </option>
-                                {% endfor %}
-                            </select>
+                            <label class="form-label fw-bold">Farming Method</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="is_organic" value="true" id="organic" {% if is_organic %}checked{% endif %}>
+                                <label class="form-check-label" for="organic">
+                                    Organic Products Only
+                                </label>
+                            </div>
                         </div>
-                        {% endif %}
 
                         <!-- Price Range -->
                         <div class="mb-4">
-                            <label class="form-label fw-bold">Price Range</label>
+                            <label class="form-label fw-bold">Price Range (KES)</label>
                             <div class="row g-2">
                                 <div class="col-6">
                                     <input type="number" name="min_price" class="form-control" placeholder="Min" step="0.01" value="{{ min_price }}">
@@ -127,6 +121,19 @@
                             </select>
                         </div>
 
+                        <!-- County Filter -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">County</label>
+                            <select name="county" class="form-select">
+                                <option value="">All Counties</option>
+                                {% for county in counties %}
+                                <option value="{{ county.id }}" {% if selected_county == county.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ county.name }} ({{ county.product_count }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
                         <!-- Filter Buttons -->
                         <div class="d-grid gap-2">
                             <button type="submit" class="btn btn-primary">Apply Filters</button>
@@ -144,12 +151,13 @@
                         <form method="get" class="d-flex align-items-center">
                             <!-- Keep existing filter parameters -->
                             {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
-                            {% if current_brand %}<input type="hidden" name="brand" value="{{ current_brand }}">{% endif %}
                             {% if current_subcategory %}<input type="hidden" name="subcategory" value="{{ current_subcategory }}">{% endif %}
-                            {% if current_tag %}<input type="hidden" name="tag" value="{{ current_tag }}">{% endif %}
+                            {% if quality_grade %}<input type="hidden" name="quality_grade" value="{{ quality_grade }}">{% endif %}
+                            {% if is_organic %}<input type="hidden" name="is_organic" value="true">{% endif %}
                             {% if min_price %}<input type="hidden" name="min_price" value="{{ min_price }}">{% endif %}
                             {% if max_price %}<input type="hidden" name="max_price" value="{{ max_price }}">{% endif %}
                             {% if stock_status %}<input type="hidden" name="stock_status" value="{{ stock_status }}">{% endif %}
+                            {% if selected_county %}<input type="hidden" name="county" value="{{ selected_county }}">{% endif %}
                             
                             <label class="me-2">Sort by:</label>
                             <select name="sort" class="form-select me-2" style="width: auto;" onchange="this.form.submit()">
@@ -163,12 +171,13 @@
                         <form method="get" class="d-flex align-items-center justify-content-md-end">
                             <!-- Keep existing filter parameters -->
                             {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
-                            {% if current_brand %}<input type="hidden" name="brand" value="{{ current_brand }}">{% endif %}
                             {% if current_subcategory %}<input type="hidden" name="subcategory" value="{{ current_subcategory }}">{% endif %}
-                            {% if current_tag %}<input type="hidden" name="tag" value="{{ current_tag }}">{% endif %}
+                            {% if quality_grade %}<input type="hidden" name="quality_grade" value="{{ quality_grade }}">{% endif %}
+                            {% if is_organic %}<input type="hidden" name="is_organic" value="true">{% endif %}
                             {% if min_price %}<input type="hidden" name="min_price" value="{{ min_price }}">{% endif %}
                             {% if max_price %}<input type="hidden" name="max_price" value="{{ max_price }}">{% endif %}
                             {% if stock_status %}<input type="hidden" name="stock_status" value="{{ stock_status }}">{% endif %}
+                            {% if selected_county %}<input type="hidden" name="county" value="{{ selected_county }}">{% endif %}
                             {% if sort_by %}<input type="hidden" name="sort" value="{{ sort_by }}">{% endif %}
                             
                             <label class="me-2">Show:</label>
@@ -187,17 +196,20 @@
                     <div class="col-xl-4 col-lg-6 col-md-6 wow fadeInUp" data-wow-delay="{{ forloop.counter0|floatformat:1|add:"0.1" }}s">
                         <div class="product-item">
                             <div class="position-relative bg-light overflow-hidden">
-                                {% if product.main_image %}
-                                    <img class="img-fluid w-100" src="{{ product.main_image.url }}" alt="{{ product.name }}" style="height: 250px; object-fit: cover;">
+                                {% if product.images.exists %}
+                                    {% with product.images.first as main_image %}
+                                    <img class="img-fluid w-100" src="{{ main_image.image.url }}" alt="{{ product.name }}" style="height: 250px; object-fit: cover;">
+                                    {% endwith %}
                                 {% else %}
                                     <img class="img-fluid w-100" src="{% static 'img/product-placeholder.jpg' %}" alt="{{ product.name }}" style="height: 250px; object-fit: cover;">
                                 {% endif %}
                                 
-                                {% if product.tags.exists %}
-                                    {% for tag in product.tags.all %}
-                                        <div class="bg-secondary rounded text-white position-absolute start-0 top-0 m-4 py-1 px-3" style="background-color: {{ tag.color }} !important;">{{ tag.name }}</div>
-                                        {% if forloop.first %}{% endif %}
-                                    {% endfor %}
+                                {% if product.is_organic %}
+                                    <div class="bg-success rounded text-white position-absolute start-0 top-0 m-4 py-1 px-3">Organic</div>
+                                {% endif %}
+
+                                {% if product.is_featured %}
+                                    <div class="bg-primary rounded text-white position-absolute start-0 top-0 m-4 py-1 px-3" style="top: 40px !important;">Featured</div>
                                 {% endif %}
 
                                 {% if not product.is_in_stock %}
@@ -205,32 +217,48 @@
                                 {% elif product.stock_status == 'low_stock' %}
                                     <div class="bg-warning rounded text-dark position-absolute end-0 top-0 m-4 py-1 px-3">Low Stock</div>
                                 {% endif %}
+
+                                {% if product.discount_price %}
+                                    <div class="bg-danger rounded text-white position-absolute end-0 bottom-0 m-4 py-1 px-3">-{{ product.discount_percentage }}%</div>
+                                {% endif %}
                             </div>
                             <div class="text-center p-4">
-                                <a class="d-block h5 mb-2" href="{{ product.get_absolute_url }}">{{ product.name }}</a>
+                                <a class="d-block h5 mb-2" href="{% url 'product_detail' product.slug %}">{{ product.name }}</a>
                                 <div class="mb-2">
-                                    <span class="text-primary me-1 fw-bold">ksh{{ product.selling_price }}</span>
+                                    <span class="text-primary me-1 fw-bold">KES {{ product.selling_price }}</span>
                                     {% if product.discount_price %}
-                                        <span class="text-body text-decoration-line-through">ksh{{ product.price }}</span>
-                                        <span class="badge bg-danger ms-2">-{{ product.discount_percentage }}%</span>
+                                        <span class="text-body text-decoration-line-through">KES {{ product.price }}</span>
                                     {% endif %}
                                 </div>
                                 <div class="mt-2">
-                                    <small class="text-muted">{{ product.unit|upper }}</small>
-                                    {% if product.brand %}
-                                    <small class="text-muted"> | {{ product.brand.name }}</small>
-                                    {% endif %}
+                                    <small class="text-muted">per {{ product.unit|upper }}</small>
                                     {% if product.subcategory %}
                                     <small class="text-muted"> | {{ product.subcategory.name }}</small>
                                     {% endif %}
+                                    <small class="text-muted"> | {{ product.quality_grade|capfirst }}</small>
+                                </div>
+                                <div class="mt-2">
+                                    <small class="text-info">
+                                        <i class="fas fa-map-marker-alt"></i> {{ product.farmer.county.name }}
+                                    </small>
                                 </div>
                                 {% if product.short_description %}
                                 <p class="text-muted small mt-2">{{ product.short_description|truncatechars:80 }}</p>
                                 {% endif %}
+                                <div class="mt-2">
+                                    <small class="text-success">
+                                        <i class="fas fa-user-tie"></i> {{ product.farmer.farm_name }}
+                                    </small>
+                                    {% if product.farmer.is_verified %}
+                                    <span class="badge bg-success ms-1" title="Verified Farmer">
+                                        <i class="fas fa-check"></i>
+                                    </span>
+                                    {% endif %}
+                                </div>
                             </div>
                             <div class="d-flex border-top">
                                 <small class="w-50 text-center border-end py-2">
-                                    <a class="text-body" href="{{ product.get_absolute_url }}">
+                                    <a class="text-body" href="{% url 'product_detail' product.slug %}">
                                         <i class="fa fa-eye text-primary me-2"></i>View Detail
                                     </a>
                                 </small>
@@ -315,20 +343,56 @@
 function addToCart(productId) {
     // Add your cart functionality here
     // You can make an AJAX call to add the product to cart
-    alert('Product added to cart! (Implement cart functionality)');
+    fetch('/cart/add/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            product_id: productId,
+            quantity: 1
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Product added to cart successfully!');
+            // Update cart counter if you have one
+            if (document.querySelector('.cart-count')) {
+                document.querySelector('.cart-count').textContent = data.cart_count;
+            }
+        } else {
+            alert('Error adding product to cart: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error adding product to cart');
+    });
 }
 
 // Auto-submit filter form when values change
 document.addEventListener('DOMContentLoaded', function() {
     const filterForm = document.getElementById('filterForm');
-    const formElements = filterForm.querySelectorAll('select, input[type="number"]');
+    const formElements = filterForm.querySelectorAll('select, input[type="checkbox"]');
     
     formElements.forEach(element => {
-        if (element.type !== 'text') {  // Don't auto-submit on text input changes
-            element.addEventListener('change', function() {
+        element.addEventListener('change', function() {
+            filterForm.submit();
+        });
+    });
+    
+    // Delay auto-submit for number inputs to avoid excessive requests
+    const numberInputs = filterForm.querySelectorAll('input[type="number"]');
+    numberInputs.forEach(input => {
+        let timeout;
+        input.addEventListener('input', function() {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => {
                 filterForm.submit();
-            });
-        }
+            }, 1000); // 1 second delay
+        });
     });
 });
 </script>

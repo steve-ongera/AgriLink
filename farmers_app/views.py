@@ -552,51 +552,297 @@ def product_list(request):
     
     return render(request, 'product_list.html', context)
 
-def category_products(request, slug):
+def category_products(request, category_slug):
     """
-    Products by category
+    Display products for a specific category with filtering, sorting, and pagination
     """
-    category = get_object_or_404(Category, slug=slug, is_active=True)
+    # Get the category or return 404
+    category = get_object_or_404(Category, slug=category_slug, is_active=True)
     
+    # Base queryset - only active products
     products = Product.objects.filter(
         category=category,
+        is_active=True,
+        farmer__is_active=True
+    ).select_related(
+        'farmer', 'farmer__county', 'subcategory'
+    ).prefetch_related('images')
+    
+    # Get filter parameters from request
+    search_query = request.GET.get('q', '').strip()
+    current_subcategory = request.GET.get('subcategory', '')
+    quality_grade = request.GET.get('quality_grade', '')
+    is_organic = request.GET.get('is_organic') == 'true'
+    min_price = request.GET.get('min_price', '')
+    max_price = request.GET.get('max_price', '')
+    stock_status = request.GET.get('stock_status', '')
+    selected_county = request.GET.get('county', '')
+    sort_by = request.GET.get('sort', 'newest')
+    items_per_page = int(request.GET.get('per_page', 12))
+    
+    # Apply filters
+    if search_query:
+        products = products.filter(
+            Q(name__icontains=search_query) |
+            Q(description__icontains=search_query) |
+            Q(short_description__icontains=search_query) |
+            Q(farmer__farm_name__icontains=search_query) |
+            Q(variety__icontains=search_query)
+        )
+    
+    if current_subcategory:
+        try:
+            subcategory = SubCategory.objects.get(
+                slug=current_subcategory, 
+                category=category
+            )
+            products = products.filter(subcategory=subcategory)
+        except SubCategory.DoesNotExist:
+            pass
+    
+    if quality_grade:
+        products = products.filter(quality_grade=quality_grade)
+    
+    if is_organic:
+        products = products.filter(is_organic=True)
+    
+    if min_price:
+        try:
+            min_price_decimal = float(min_price)
+            products = products.filter(price__gte=min_price_decimal)
+        except (ValueError, TypeError):
+            min_price = ''
+    
+    if max_price:
+        try:
+            max_price_decimal = float(max_price)
+            products = products.filter(price__lte=max_price_decimal)
+        except (ValueError, TypeError):
+            max_price = ''
+    
+    if stock_status:
+        products = products.filter(stock_status=stock_status)
+    
+    if selected_county:
+        try:
+            county_id = int(selected_county)
+            products = products.filter(farmer__county_id=county_id)
+        except (ValueError, TypeError):
+            selected_county = ''
+    
+    # Apply sorting
+    sort_options = [
+        ('newest', 'Newest First'),
+        ('oldest', 'Oldest First'),
+        ('price_low', 'Price: Low to High'),
+        ('price_high', 'Price: High to Low'),
+        ('name_asc', 'Name: A to Z'),
+        ('name_desc', 'Name: Z to A'),
+        ('rating', 'Highest Rated'),
+        ('popular', 'Most Popular'),
+    ]
+    
+    if sort_by == 'newest':
+        products = products.order_by('-created_at')
+    elif sort_by == 'oldest':
+        products = products.order_by('created_at')
+    elif sort_by == 'price_low':
+        products = products.order_by('price')
+    elif sort_by == 'price_high':
+        products = products.order_by('-price')
+    elif sort_by == 'name_asc':
+        products = products.order_by('name')
+    elif sort_by == 'name_desc':
+        products = products.order_by('-name')
+    elif sort_by == 'rating':
+        products = products.filter(farmer__rating__gt=0).order_by('-farmer__rating')
+    elif sort_by == 'popular':
+        products = products.order_by('-view_count', '-total_sold')
+    else:
+        products = products.order_by('-created_at')  # Default
+    
+    # Get sidebar filter data
+    subcategories = SubCategory.objects.filter(
+        category=category, 
         is_active=True
-    ).select_related('category', 'subcategory', 'farmer').prefetch_related('images')
+    ).annotate(
+        product_count=Count('products', filter=Q(products__is_active=True))
+    ).filter(product_count__gt=0).order_by('name')
     
-    # Apply additional filters
-    subcategory_slug = request.GET.get('subcategory')
-    if subcategory_slug:
-        products = products.filter(subcategory__slug=subcategory_slug)
+    # Get counties with product counts
+    counties = County.objects.filter(
+        farmerprofile__products__category=category,
+        farmerprofile__products__is_active=True,
+        farmerprofile__is_active=True
+    ).annotate(
+        product_count=Count('farmerprofile__products', distinct=True)
+    ).filter(product_count__gt=0).order_by('name')
     
-    # Sort products
-    sort_by = request.GET.get('sort', '-created_at')
-    products = products.order_by(sort_by)
+    # Get choices for filters
+    quality_grade_choices = Product.QUALITY_GRADE_CHOICES
+    stock_status_choices = Product.STOCK_STATUS_CHOICES
+    per_page_options = [12, 24, 36, 48]
     
-    # Add main_image to products
-    for product in products:
-        main_image = product.images.filter(is_main=True).first()
-        if not main_image:
-            main_image = product.images.first()
-        product.main_image = main_image
+    # Check if any filters are applied
+    has_filters = any([
+        search_query, current_subcategory, quality_grade, 
+        is_organic, min_price, max_price, stock_status, selected_county
+    ])
+    
+    # Get total count before pagination
+    total_products = products.count()
     
     # Pagination
-    paginator = Paginator(products, 12)
-    page = request.GET.get('page')
-    products = paginator.get_page(page)
+    paginator = Paginator(products, items_per_page)
+    page_number = request.GET.get('page', 1)
     
-    # Get subcategories for this category
-    subcategories = category.subcategories.filter(is_active=True)
+    try:
+        page_obj = paginator.page(page_number)
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages)
+    
+    # Update view count for products on current page
+    if request.method == 'GET':
+        product_ids = [product.id for product in page_obj]
+        Product.objects.filter(id__in=product_ids).update(
+            view_count=F('view_count') + 1
+        )
     
     context = {
         'category': category,
-        'products': products,
+        'products': page_obj,
+        'page_obj': page_obj,
+        'total_products': total_products,
+        
+        # Sidebar data
         'subcategories': subcategories,
-        'current_subcategory': subcategory_slug,
+        'counties': counties,
+        'quality_grade_choices': quality_grade_choices,
+        'stock_status_choices': stock_status_choices,
+        
+        # Filter values
+        'search_query': search_query,
+        'current_subcategory': current_subcategory,
+        'quality_grade': quality_grade,
+        'is_organic': is_organic,
+        'min_price': min_price,
+        'max_price': max_price,
+        'stock_status': stock_status,
+        'selected_county': selected_county,
+        'has_filters': has_filters,
+        
+        # Sorting and pagination
+        'sort_by': sort_by,
+        'sort_options': sort_options,
+        'items_per_page': items_per_page,
+        'per_page_options': per_page_options,
     }
     
     return render(request, 'category_products.html', context)
 
+from django.views.decorators.http import require_http_methods
 
+
+@require_http_methods(["POST"])
+def add_to_cart_ajax(request):
+    """
+    AJAX view to add products to cart
+    """
+    try:
+        data = json.loads(request.body)
+        product_id = data.get('product_id')
+        quantity = float(data.get('quantity', 1))
+        
+        if quantity <= 0:
+            return JsonResponse({
+                'success': False,
+                'message': 'Invalid quantity'
+            })
+        
+        # Get the product
+        try:
+            product = Product.objects.get(id=product_id, is_active=True)
+        except Product.DoesNotExist:
+            return JsonResponse({
+                'success': False,
+                'message': 'Product not found'
+            })
+        
+        # Check stock
+        if not product.is_in_stock:
+            return JsonResponse({
+                'success': False,
+                'message': 'Product is out of stock'
+            })
+        
+        if quantity > product.available_quantity:
+            return JsonResponse({
+                'success': False,
+                'message': f'Only {product.available_quantity} {product.unit} available'
+            })
+        
+        if quantity < product.minimum_order:
+            return JsonResponse({
+                'success': False,
+                'message': f'Minimum order is {product.minimum_order} {product.unit}'
+            })
+        
+        # Get or create cart
+        session_key = request.session.session_key
+        if not session_key:
+            request.session.create()
+            session_key = request.session.session_key
+        
+        cart, created = Cart.objects.get_or_create(
+            session_id=session_key,
+            defaults={'buyer': getattr(request.user, 'buyer_profile', None) if request.user.is_authenticated else None}
+        )
+        
+        # Add or update cart item
+        cart_item, item_created = CartItem.objects.get_or_create(
+            cart=cart,
+            product=product,
+            defaults={'quantity': quantity}
+        )
+        
+        if not item_created:
+            # Update existing item
+            new_quantity = cart_item.quantity + quantity
+            
+            # Check total quantity against stock
+            if new_quantity > product.available_quantity:
+                return JsonResponse({
+                    'success': False,
+                    'message': f'Cannot add more. Only {product.available_quantity} {product.unit} available'
+                })
+            
+            cart_item.quantity = new_quantity
+            cart_item.save()
+        
+        # Get cart totals
+        cart_count = cart.total_items
+        cart_total = cart.total_amount
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Product added to cart successfully',
+            'cart_count': cart_count,
+            'cart_total': float(cart_total),
+            'item_total': float(cart_item.total_price)
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'message': 'Invalid JSON data'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': 'An error occurred while adding to cart'
+        })
  
 
 from django.shortcuts import render, redirect
