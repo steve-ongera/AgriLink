@@ -1,0 +1,203 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Order Confirmation{% endblock %}
+
+{% block content %}
+<!-- Page Header Start -->
+<div class="container-fluid page-header mb-5 wow fadeIn" data-wow-delay="0.1s">
+    <div class="container">
+        <h1 class="display-3 mb-3 animated slideInDown">Order Confirmation</h1>
+        <nav aria-label="breadcrumb animated slideInDown">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a class="text-body" href="{% url 'home' %}">Home</a></li>
+                <li class="breadcrumb-item"><a class="text-body" href="{% url 'product_list' %}">Products</a></li>
+                <li class="breadcrumb-item"><a class="text-body" href="{% url 'cart_summary' %}">Cart</a></li>
+                <li class="breadcrumb-item"><a class="text-body" href="{% url 'checkout' %}">Checkout</a></li>
+                <li class="breadcrumb-item text-dark active" aria-current="page">Order Confirmation</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+<!-- Page Header End -->
+
+<!-- Order Confirmation Start -->
+<div class="container-xxl py-5">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header bg-success text-white text-center">
+                        <div class="py-3">
+                            <i class="fab fa-whatsapp fa-3x mb-3"></i>
+                            <h3 class="mb-0">Order Ready for WhatsApp!</h3>
+                            {% if order_number %}
+                            <p class="mb-0">Order #{{ order_number }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="text-center mb-4">
+                            <h5>Your order details have been prepared</h5>
+                            <p class="text-muted">Click the button below to send your order via WhatsApp</p>
+                        </div>
+
+                        <!-- Order Summary -->
+                        <div class="bg-light p-3 rounded mb-4">
+                            <h6 class="mb-3"><i class="fas fa-user me-2"></i>Customer Information:</h6>
+                            <div class="row">
+                                <div class="col-sm-6">
+                                    <p class="mb-1"><strong>Name:</strong> {{ customer_name }}</p>
+                                    <p class="mb-1"><strong>Phone:</strong> {{ customer_phone }}</p>
+                                </div>
+                                <div class="col-sm-6">
+                                    <p class="mb-1"><strong>Total Amount:</strong> <span class="text-success fw-bold">KSh {{ total_amount|floatformat:2 }}</span></p>
+                                    <p class="mb-1"><strong>Items:</strong> {{ cart_items|length }} product{{ cart_items|length|pluralize }}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- WhatsApp Message Preview -->
+                        <div class="mb-4">
+                            <h6><i class="fas fa-eye me-2"></i>Message Preview:</h6>
+                            <div class="bg-light border p-3 rounded" style="max-height: 200px; overflow-y: auto;">
+                                <pre class="mb-0 text-wrap" style="white-space: pre-wrap; font-size: 0.9rem;">{{ whatsapp_message }}</pre>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="text-center">
+                            <a href="{{ whatsapp_url }}" target="_blank" class="btn btn-success btn-lg me-3" id="whatsappBtn">
+                                <i class="fab fa-whatsapp me-2"></i>Send via WhatsApp
+                            </a>
+                            <a href="{% url 'checkout' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-edit me-2"></i>Edit Order
+                            </a>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <!-- Instructions -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-info-circle me-2 text-primary"></i>What happens next?</h6>
+                                <ul class="list-unstyled">
+                                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Send your order via WhatsApp</li>
+                                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>We'll confirm your order details</li>
+                                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>We'll arrange delivery with you</li>
+                                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Payment on delivery or via M-Pesa</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-clock me-2 text-warning"></i>Response Time</h6>
+                                <p class="text-muted mb-3">We typically respond to WhatsApp messages within 30 minutes during business hours (8 AM - 8 PM).</p>
+                                
+                                <h6><i class="fas fa-phone-alt me-2 text-info"></i>Alternative Contact</h6>
+                                <p class="text-muted mb-0">
+                                    Phone: <a href="tel:+254712345678">+254 712 345 678</a><br>
+                                    Email: <a href="mailto:orders@farmstore.co.ke">orders@farmstore.co.ke</a>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Continue Shopping -->
+                <div class="text-center mt-4">
+                    <a href="{% url 'product_list' %}" class="btn btn-primary">
+                        <i class="fas fa-shopping-cart me-2"></i>Continue Shopping
+                    </a>
+                    <a href="{% url 'home' %}" class="btn btn-outline-primary ms-2">
+                        <i class="fas fa-home me-2"></i>Back to Home
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Order Confirmation End -->
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const whatsappBtn = document.getElementById('whatsappBtn');
+    
+    // Track if WhatsApp button was clicked
+    whatsappBtn.addEventListener('click', function() {
+        // Change button text to indicate message was sent
+        setTimeout(function() {
+            whatsappBtn.innerHTML = '<i class="fas fa-check me-2"></i>Message Sent!';
+            whatsappBtn.classList.remove('btn-success');
+            whatsappBtn.classList.add('btn-outline-success');
+        }, 1000);
+        
+        // Show success message
+        const successAlert = document.createElement('div');
+        successAlert.className = 'alert alert-success alert-dismissible fade show mt-3';
+        successAlert.innerHTML = `
+            <i class="fas fa-check-circle me-2"></i>
+            <strong>WhatsApp message prepared!</strong> Please check your WhatsApp to send the message.
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        setTimeout(function() {
+            whatsappBtn.parentElement.appendChild(successAlert);
+        }, 500);
+    });
+    
+    // Copy message to clipboard functionality
+    const messagePreview = document.querySelector('pre');
+    messagePreview.addEventListener('click', function() {
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(this.textContent).then(function() {
+                // Show tooltip or toast notification
+                const toast = document.createElement('div');
+                toast.className = 'toast-notification';
+                toast.innerHTML = '<i class="fas fa-check me-2"></i>Message copied to clipboard!';
+                toast.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    background: #28a745;
+                    color: white;
+                    padding: 10px 20px;
+                    border-radius: 5px;
+                    z-index: 9999;
+                    font-size: 14px;
+                `;
+                document.body.appendChild(toast);
+                
+                setTimeout(function() {
+                    toast.remove();
+                }, 3000);
+            });
+        }
+    });
+    
+    // Add click indicator to message preview
+    messagePreview.style.cursor = 'pointer';
+    messagePreview.title = 'Click to copy message';
+});
+</script>
+
+<style>
+.toast-notification {
+    animation: slideInRight 0.3s ease-out, slideOutRight 0.3s ease-in 2.7s;
+}
+
+@keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideOutRight {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(100%); opacity: 0; }
+}
+
+pre.text-wrap:hover {
+    background-color: #e9ecef !important;
+    transition: background-color 0.2s ease;
+}
+</style>
+
+{% endblock %}

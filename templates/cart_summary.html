@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Shopping Cart{% endblock %}
+
+{% block content %}
+<!-- Page Header Start -->
+<div class="container-fluid page-header mb-5 wow fadeIn" data-wow-delay="0.1s">
+    <div class="container">
+        <h1 class="display-3 mb-3 animated slideInDown">Shopping Cart</h1>
+        <nav aria-label="breadcrumb animated slideInDown">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a class="text-body" href="{% url 'home' %}">Home</a></li>
+                <li class="breadcrumb-item"><a class="text-body" href="{% url 'product_list' %}">Products</a></li>
+                <li class="breadcrumb-item text-dark active" aria-current="page">Cart</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+<!-- Page Header End -->
+
+<!-- Cart Start -->
+<div class="container-xxl py-5">
+    <div class="container">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        {% if cart_items %}
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Price</th>
+                                    <th>Quantity</th>
+                                    <th>Total</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in cart_items %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            {% if item.product_image %}
+                                                <img src="{{ item.product_image }}" alt="{{ item.product_name }}" style="width: 60px; height: 60px; object-fit: cover;" class="me-3">
+                                            {% else %}
+                                                <img src="{% static 'img/product-placeholder.jpg' %}" alt="{{ item.product_name }}" style="width: 60px; height: 60px; object-fit: cover;" class="me-3">
+                                            {% endif %}
+                                            <div>
+                                                <h6 class="mb-1">{{ item.product_name }}</h6>
+                                                <small class="text-muted">SKU: {{ item.sku }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>KSh {{ item.unit_price|floatformat:2 }} / {{ item.unit }}</td>
+                                    <td>
+                                        <form method="post" action="{% url 'update_cart_item' item.id %}" class="d-inline">
+                                            {% csrf_token %}
+                                            <div class="input-group" style="width: 120px;">
+                                                <input type="number" name="quantity" value="{{ item.quantity }}" min="1" max="{{ item.stock_available }}" class="form-control form-control-sm text-center">
+                                                <button type="submit" class="btn btn-outline-primary btn-sm">Update</button>
+                                            </div>
+                                        </form>
+                                        <small class="text-muted d-block mt-1">Available: {{ item.stock_available }}</small>
+                                    </td>
+                                    <td>
+                                        <strong>KSh {{ item.total_price|floatformat:2 }}</strong>
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'remove_cart_item' item.id %}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove this item from cart?')">
+                                            <i class="fa fa-trash"></i> Remove
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{% url 'product_list' %}" class="btn btn-outline-primary">
+                            <i class="fa fa-arrow-left me-2"></i>Continue Shopping
+                        </a>
+                        <form method="post" action="{% url 'clear_cart' %}" class="d-inline" onsubmit="return confirm('Are you sure you want to clear your cart?')">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-secondary">
+                                <i class="fa fa-trash me-2"></i>Clear Cart
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Cart Summary</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between mb-3">
+                                <span>Total Items:</span>
+                                <span>{{ cart_total }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-3">
+                                <span>Subtotal:</span>
+                                <span>KSh {{ cart_amount|floatformat:2 }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-3">
+                                <span>Delivery:</span>
+                                <span class="text-muted">To be discussed</span>
+                            </div>
+                            <hr>
+                            <div class="d-flex justify-content-between mb-3">
+                                <strong>Estimated Total:</strong>
+                                <strong>KSh {{ cart_amount|floatformat:2 }}</strong>
+                            </div>
+                            
+                            <div class="d-grid gap-2">
+                                <a href="{% url 'checkout' %}" class="btn btn-primary btn-lg">
+                                    <i class="fa fa-shopping-cart me-2"></i>Proceed to Checkout
+                                </a>
+                            </div>
+                            
+                            <div class="text-center mt-3">
+                                <small class="text-muted">
+                                    <i class="fab fa-whatsapp text-success me-1"></i>
+                                    Orders are placed via WhatsApp
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Payment Methods Info -->
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h6 class="mb-0">Payment Methods</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="text-center">
+                                <p class="mb-2"><i class="fas fa-mobile-alt text-success me-2"></i>M-Pesa</p>
+                                <p class="mb-2"><i class="fas fa-money-bill-wave text-primary me-2"></i>Cash on Delivery</p>
+                                <p class="mb-0"><i class="fas fa-credit-card text-info me-2"></i>Bank Transfer</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <!-- Empty Cart -->
+            <div class="text-center py-5">
+                <div class="mb-4">
+                    <i class="fas fa-shopping-cart fa-5x text-muted"></i>
+                </div>
+                <h3 class="mb-3">Your Cart is Empty</h3>
+                <p class="text-muted mb-4">Looks like you haven't added any products to your cart yet.</p>
+                <a href="{% url 'product_list' %}" class="btn btn-primary btn-lg">
+                    <i class="fa fa-shopping-bag me-2"></i>Start Shopping
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+<!-- Cart End -->
+{% endblock %}

@@ -1,0 +1,1169 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load dict_extras %}
+
+{% block title %}{{ product.name }} - {{ product.category.name }}{% endblock %}
+
+{% block meta_description %}{{ product.short_description|default:product.description|truncatewords:30 }}{% endblock %}
+
+{% block content %}
+
+<style>
+.product-gallery {
+    position: sticky;
+    top: 100px;
+}
+
+.main-image-container {
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f8f9fa;
+    position: relative;
+}
+
+.main-product-image {
+    width: 100%;
+    height: 400px;
+    object-fit: contain;
+    background: white;
+}
+
+.thumbnail-images {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    overflow-x: auto;
+}
+
+.thumbnail-img {
+    width: 70px;
+    height: 70px;
+    object-fit: cover;
+    border: 2px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: border-color 0.3s;
+}
+
+.thumbnail-img.active,
+.thumbnail-img:hover {
+    border-color: #28a745;
+}
+
+.product-info {
+    padding: 20px 0;
+}
+
+.product-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 10px;
+}
+
+.brand-link {
+    color: #007bff;
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+
+.rating-section {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin: 15px 0;
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.stars {
+    color: #ffc107;
+}
+
+.stars .far {
+    color: #e9ecef;
+}
+
+.rating-text {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.price-section {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin: 20px 0;
+}
+
+.current-price {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #28a745;
+}
+
+.original-price {
+    font-size: 1.2rem;
+    color: #6c757d;
+    text-decoration: line-through;
+    margin-left: 10px;
+}
+
+.discount-badge {
+    background: #dc3545;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-left: 10px;
+}
+
+.savings-info {
+    color: #28a745;
+    font-weight: 600;
+    margin-top: 8px;
+}
+
+.stock-status {
+    margin: 15px 0;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 15px;
+    margin: 25px 0;
+}
+
+.btn-add-cart {
+    flex: 1;
+    padding: 12px 20px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.btn-whatsapp {
+    background: #25d366;
+    border-color: #25d366;
+    color: white;
+    padding: 12px 20px;
+    font-weight: 600;
+    text-decoration: none;
+    border-radius: 5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s;
+}
+
+.btn-whatsapp:hover {
+    background: #1da851;
+    color: white;
+}
+
+.quantity-selector {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 20px 0;
+}
+
+.quantity-input {
+    width: 80px;
+    text-align: center;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.product-attributes {
+    margin: 20px 0;
+}
+
+.attribute-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.attribute-row:last-child {
+    border-bottom: none;
+}
+
+.delivery-info {
+    background: #e7f3ff;
+    border: 1px solid #b3d9ff;
+    border-radius: 8px;
+    padding: 15px;
+    margin: 20px 0;
+}
+
+.tabs-section {
+    margin: 40px 0;
+}
+
+.nav-tabs .nav-link {
+    color: #495057;
+    font-weight: 600;
+    border: none;
+    border-bottom: 3px solid transparent;
+    padding: 15px 20px;
+}
+
+.nav-tabs .nav-link.active {
+    color: #28a745;
+    border-bottom-color: #28a745;
+    background: none;
+}
+
+.tab-pane {
+    padding: 30px 0;
+}
+
+.review-item {
+    border-bottom: 1px solid #eee;
+    padding: 20px 0;
+}
+
+.review-item:last-child {
+    border-bottom: none;
+}
+
+.review-rating {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.rating-breakdown {
+    margin: 20px 0;
+}
+
+.rating-row {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 8px;
+}
+
+.rating-progress {
+    flex: 1;
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.rating-progress-bar {
+    height: 100%;
+    background: #ffc107;
+    transition: width 0.3s;
+}
+
+.related-products {
+    margin: 50px 0;
+    margin-bottom: 20px;
+}
+
+.product-item {
+    border: 1px solid #eee;
+    border-radius: 8px;
+    transition: transform 0.3s, box-shadow 0.3s;
+    height: 100%;
+    text-decoration: none;
+    color: inherit;
+    background: #fff;
+  margin-bottom: 30px;
+}
+
+
+
+.product-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    color: inherit;
+    text-decoration: none;
+}
+
+.product-item img {
+    width: 100%;
+    height: 180px;
+    object-fit: contain;
+    margin-bottom: 10px;
+}
+
+.zoom-container {
+    position: relative;
+    overflow: hidden;
+}
+
+.zoom-lens {
+    position: absolute;
+    border: 2px solid #000;
+    cursor: crosshair;
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .main-product-image {
+        height: 300px;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+    }
+    
+    .current-price {
+        font-size: 1.5rem;
+    }
+    
+    .product-title {
+        font-size: 1.2rem;
+    }
+}
+</style>
+
+    <!-- Page Header -->
+    <div class="container-fluid page-header mb-5 wow fadeIn" data-wow-delay="0.1s">
+        <div class="container">
+            <nav aria-label="breadcrumb animated slideInDown">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a class="text-body" href="{% url 'product_list' %}">Products</a></li>
+                    <li class="breadcrumb-item"><a class="text-body" href="{% url 'category_products' product.category.slug %}">{{ product.category.name }}</a></li>
+                    {% if product.subcategory %}
+                    <li class="breadcrumb-item"><a class="text-body" href="{% url 'product_list' %}?subcategory={{ product.subcategory.slug }}">{{ product.subcategory.name }}</a></li>
+                    {% endif %}
+                    <li class="breadcrumb-item text-dark active" aria-current="page">{{ product.name|truncatechars:30 }}</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="container-xxl py-5">
+        <div class="container">
+            <div class="row">
+                <!-- Product Images -->
+                <div class="col-lg-5">
+                    <div class="product-gallery wow fadeInUp" data-wow-delay="0.1s">
+                        <div class="product-gallery wow fadeInUp" data-wow-delay="0.1s">
+                          <div class="main-image-container zoom-container">
+                                <img id="mainProductImage" class="main-product-image" 
+                                    src="{% if main_image %}{{ main_image.url }}{% else %}{% static 'img/product-placeholder.jpg' %}{% endif %}" 
+                                    alt="{{ product.name }}"
+                                    data-zoom="{% if main_image %}{{ main_image.url }}{% else %}{% static 'img/product-placeholder.jpg' %}{% endif %}">
+                                    
+                                {% if savings_percentage > 0 %}
+                                <div class="position-absolute top-0 start-0 m-4 py-1 px-3 bg-danger text-white rounded">
+                                    -{{ savings_percentage }}%
+                                </div>
+                                {% endif %}
+                                
+                                {% if product.tags.exists %}
+                                <div class="position-absolute top-0 end-0 m-4">
+                                    {% for tag in product.tags.all %}
+                                    <span class="badge" style="background-color: {{ tag.color }}; margin-left: 5px;">{{ tag.name }}</span>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        {% if product_images.count > 1 %}
+                        <div class="thumbnail-images">
+                            {% for image in product_images %}
+                            <img class="thumbnail-img {% if forloop.first %}active{% endif %}" 
+                                 src="{{ image.image.url }}" 
+                                 alt="{{ product.name }}"
+                                 onclick="changeMainImage('{{ image.image.url }}', this)">
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Product Info -->
+                <div class="col-lg-7">
+                    <div class="product-info wow fadeInUp" data-wow-delay="0.3s">
+                        <h1 class="product-title">{{ product.name }}</h1>
+                        
+                        {% if product.brand %}
+                        <p class="mb-2">
+                            Brand: <a href="{% url 'product_list' %}?brand={{ product.brand.slug }}" class="brand-link">{{ product.brand.name }}</a>
+                        </p>
+                        {% endif %}
+                        
+                        <!-- Rating Section -->
+                        <div class="rating-section">
+                            <div class="stars">
+                                {% for i in "12345" %}
+                                    {% if forloop.counter0 < stars_full %}
+                                        <i class="fas fa-star"></i>
+                                    {% elif forloop.counter0 < stars_full|add:stars_half %}
+                                        <i class="fas fa-star-half-alt"></i>
+                                    {% else %}
+                                        <i class="far fa-star"></i>
+                                    {% endif %}
+                                {% endfor %}
+                                <span class="ms-2">({{ avg_rating }})</span>
+                            </div>
+                            <span class="rating-text">{{ total_reviews }} review{{ total_reviews|pluralize }}</span>
+                            <span class="rating-text">{{ product.sku }}</span>
+                        </div>
+
+                        <!-- Stock Status -->
+                        <div class="stock-status">
+                            <span class="badge bg-{{ stock_info.class }} p-2">
+                                <i class="fas fa-{{ stock_info.icon }} me-2"></i>{{ stock_info.text }}
+                            </span>
+                            {% if product.stock_quantity > 0 and product.stock_quantity <= product.low_stock_threshold %}
+                            <small class="text-warning d-block mt-1">
+                                <i class="fas fa-exclamation-triangle me-1"></i>Hurry! Only {{ product.stock_quantity }} left in stock
+                            </small>
+                            {% endif %}
+                        </div>
+
+                        <!-- Price Section -->
+                        <div class="price-section">
+                            <div class="d-flex align-items-center flex-wrap">
+                                <span class="current-price">KSh {{ product.selling_price|floatformat:2 }}</span>
+                                {% if product.discount_price %}
+                                <span class="original-price">KSh {{ product.price|floatformat:2 }}</span>
+                                <span class="discount-badge">-{{ savings_percentage }}%</span>
+                                {% endif %}
+                            </div>
+                            {% if savings_amount > 0 %}
+                            <div class="savings-info">
+                                <i class="fas fa-tag me-1"></i>You save KSh {{ savings_amount|floatformat:2 }}
+                            </div>
+                            {% endif %}
+                            <small class="text-muted">Price per {{ product.unit }}</small>
+                        </div>
+
+                        <!-- Product Attributes -->
+                        {% if grouped_attributes %}
+                        <div class="product-attributes">
+                            <h6>Product Details</h6>
+                            {% for attr_name, attr_values in grouped_attributes.items %}
+                            <div class="attribute-row">
+                                <span class="fw-semibold">{{ attr_name }}:</span>
+                                <span>{{ attr_values|join:", " }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <!-- Quantity and Actions -->
+                        {% if product.is_in_stock %}
+                        <div class="quantity-selector">
+                            <label for="quantity" class="fw-semibold">Quantity:</label>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="decreaseQuantity()">-</button>
+                            <input type="number" id="quantity" class="quantity-input" value="1" min="1" max="{{ product.stock_quantity }}">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="increaseQuantity()">+</button>
+                            <small class="text-muted">{{ product.stock_quantity }} available</small>
+                        </div>
+
+                        <div class="action-buttons">
+                            <form method="post" action="{% url 'add_to_cart' product.id %}" class="d-inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="product_id" value="{{ product.id }}">
+                                <input type="hidden" name="quantity" id="form-quantity" value="1">
+                                <button type="submit" class="btn btn-success btn-add-cart">
+                                    <i class="fas fa-shopping-cart me-2"></i>Add to Cart
+                                </button>
+                            </form>
+                            <a href="https://wa.me/{{ whatsapp_number }}?text={{ whatsapp_message|urlencode }}" 
+                               class="btn-whatsapp" target="_blank">
+                                <i class="fab fa-whatsapp"></i>
+                                Order via WhatsApp
+                            </a>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            This product is currently out of stock. Contact us for availability.
+                        </div>
+                        <a href="https://wa.me/{{ whatsapp_number }}?text=Hi! I'm interested in {{ product.name }}. When will it be back in stock?" 
+                           class="btn btn-outline-success">
+                            <i class="fab fa-whatsapp me-2"></i>Ask about availability
+                        </a>
+                        {% endif %}
+
+                        <!-- Delivery Info -->
+                        <div class="delivery-info">
+                            <h6 class="mb-3"><i class="fas fa-truck me-2"></i>Delivery Information</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="mb-2"><i class="fas fa-clock text-success me-2"></i>Same day delivery available</p>
+                                    <p class="mb-0"><i class="fas fa-shield-alt text-primary me-2"></i>100% quality guarantee</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p class="mb-2"><i class="fas fa-undo text-warning me-2"></i>Easy returns within 7 days</p>
+                                    <p class="mb-0"><i class="fas fa-phone text-info me-2"></i>24/7 customer support</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Product Details Tabs -->
+            <div class="tabs-section wow fadeInUp" data-wow-delay="0.5s">
+                <ul class="nav nav-tabs" id="productTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="description-tab" data-bs-toggle="tab" 
+                                data-bs-target="#description" type="button" role="tab">Description</button>
+                    </li>
+                    {% if total_reviews > 0 %}
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="reviews-tab" data-bs-toggle="tab" 
+                                data-bs-target="#reviews" type="button" role="tab">
+                            Reviews ({{ total_reviews }})
+                        </button>
+                    </li>
+                    {% endif %}
+                    {% if grouped_attributes %}
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="specifications-tab" data-bs-toggle="tab" 
+                                data-bs-target="#specifications" type="button" role="tab">Specifications</button>
+                    </li>
+                    {% endif %}
+                </ul>
+                <div class="tab-content" id="productTabsContent">
+                    <!-- Description Tab -->
+                    <div class="tab-pane fade show active" id="description" role="tabpanel">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <h5>About this product</h5>
+                                <p>{{ product.description|linebreaks }}</p>
+                                
+                                {% if product.origin %}
+                                <h6>Origin</h6>
+                                <p>{{ product.origin }}</p>
+                                {% endif %}
+                                
+                                {% if product.harvest_date or product.expiry_date %}
+                                <h6>Freshness Information</h6>
+                                {% if product.harvest_date %}
+                                <p><strong>Harvest Date:</strong> {{ product.harvest_date }}</p>
+                                {% endif %}
+                                {% if product.expiry_date %}
+                                <p><strong>Best Before:</strong> {{ product.expiry_date }}</p>
+                                {% endif %}
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h6>Quick Facts</h6>
+                                        <ul class="list-unstyled">
+                                            <li><strong>Category:</strong> {{ product.category.name }}</li>
+                                            {% if product.subcategory %}
+                                            <li><strong>Type:</strong> {{ product.subcategory.name }}</li>
+                                            {% endif %}
+                                            {% if product.brand %}
+                                            <li><strong>Brand:</strong> {{ product.brand.name }}</li>
+                                            {% endif %}
+                                            <li><strong>Unit:</strong> {{ product.get_unit_display }}</li>
+                                            {% if product.weight %}
+                                            <li><strong>Weight:</strong> {{ product.weight }} kg</li>
+                                            {% endif %}
+                                            {% if product.is_organic %}
+                                            <li><span class="badge bg-success">Organic</span></li>
+                                            {% endif %}
+                                            {% if product.requires_prescription %}
+                                            <li><span class="badge bg-warning">Requires Prescription</span></li>
+                                            {% endif %}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Reviews Tab -->
+                    {% if total_reviews > 0 %}
+                    <div class="tab-pane fade" id="reviews" role="tabpanel">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-body text-center">
+                                        <h2 class="mb-2">{{ avg_rating }}/5</h2>
+                                        <div class="stars mb-2">
+                                            {% for i in "12345" %}
+                                                {% if forloop.counter0 < stars_full %}
+                                                    <i class="fas fa-star"></i>
+                                                {% elif forloop.counter0 < stars_full|add:stars_half %}
+                                                    <i class="fas fa-star-half-alt"></i>
+                                                {% else %}
+                                                    <i class="far fa-star"></i>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </div>
+                                        <p class="text-muted">Based on {{ total_reviews }} review{{ total_reviews|pluralize }}</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="rating-breakdown mt-3">
+                                    {% for i in "54321" %}
+                                    <div class="rating-row">
+                                        <span>{{ forloop.counter0|add:1 }} star{{ forloop.counter0|add:1|pluralize }}</span>
+                                        <div class="rating-progress">
+                                            <div class="rating-progress-bar" style="width: {{ rating_percentages|get_item:forloop.counter0|add:1 }}%"></div>
+                                        </div>
+                                        <span>{{ rating_percentages|get_item:forloop.counter0|add:1 }}%</span>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-8">
+                                <div id="reviewsContainer">
+                                    {% for review in reviews %}
+                                    <div class="review-item">
+                                        <div class="review-rating">
+                                            <div class="stars">
+                                                {% for i in "12345" %}
+                                                    {% if forloop.counter <= review.rating %}
+                                                        <i class="fas fa-star"></i>
+                                                    {% else %}
+                                                        <i class="far fa-star"></i>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </div>
+                                            <strong>{{ review.customer_name }}</strong>
+                                            <small class="text-muted">{{ review.created_at|date:"M d, Y" }}</small>
+                                        </div>
+                                        {% if review.title %}
+                                        <h6 class="mb-2">{{ review.title }}</h6>
+                                        {% endif %}
+                                        <p class="mb-0">{{ review.comment }}</p>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                
+                                {% if total_reviews > 10 %}
+                                <button class="btn btn-outline-primary" onclick="loadMoreReviews()">
+                                    Load More Reviews
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Specifications Tab -->
+                    {% if grouped_attributes %}
+                    <div class="tab-pane fade" id="specifications" role="tabpanel">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <h5>Product Specifications</h5>
+                                <table class="table table-bordered">
+                                    <tbody>
+                                        <tr>
+                                            <td><strong>Product Name</strong></td>
+                                            <td>{{ product.name }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>SKU</strong></td>
+                                            <td>{{ product.sku }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Category</strong></td>
+                                            <td>{{ product.category.name }}</td>
+                                        </tr>
+                                        {% if product.subcategory %}
+                                        <tr>
+                                            <td><strong>Subcategory</strong></td>
+                                            <td>{{ product.subcategory.name }}</td>
+                                        </tr>
+                                        {% endif %}
+                                        {% if product.brand %}
+                                        <tr>
+                                            <td><strong>Brand</strong></td>
+                                            <td>{{ product.brand.name }}</td>
+                                        </tr>
+                                        {% endif %}
+                                        <tr>
+                                            <td><strong>Unit</strong></td>
+                                            <td>{{ product.get_unit_display }}</td>
+                                        </tr>
+                                        {% if product.weight %}
+                                        <tr>
+                                            <td><strong>Weight</strong></td>
+                                            <td>{{ product.weight }} kg</td>
+                                        </tr>
+                                        {% endif %}
+                                        {% for attr_name, attr_values in grouped_attributes.items %}
+                                        <tr>
+                                            <td><strong>{{ attr_name }}</strong></td>
+                                            <td>{{ attr_values|join:", " }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Related Products -->
+            {% if related_products %}
+            <div class="related-products wow fadeInUp" data-wow-delay="0.7s">
+                <h3 class="mb-4">Related Products</h3>
+                <div class="row">
+                    {% for related_product in related_products %}
+                    <div style='border-top: 10px;' class="col-xl-3 col-lg-4 col-md-6 wow fadeInUp" data-wow-delay="{{ forloop.counter0|floatformat:1|add:"0.1" }}s">
+                        <div class="product-item">
+                            <div class="position-relative bg-light overflow-hidden">
+                                <img src="{% if related_product.main_image %}{{ related_product.main_image.url }}{% else %}{% static 'img/product-placeholder.jpg' %}{% endif %}" 
+                                     alt="{{ related_product.name }}" class="img-fluid">
+                                {% if related_product.discount_percentage > 0 %}
+                                <div class="position-absolute top-0 start-0 m-4 py-1 px-3 bg-danger text-white rounded">
+                                    -{{ related_product.discount_percentage }}%
+                                </div>
+                                {% endif %}
+                                {% if related_product.tags.exists %}
+                                <div class="position-absolute top-0 end-0 m-4">
+                                    {% for tag in related_product.tags.all %}
+                                    <span class="badge" style="background-color: {{ tag.color }};">{{ tag.name }}</span>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="text-center p-4">
+                                <a class="d-block h5 mb-2" href="{{ related_product.get_absolute_url }}">{{ related_product.name }}</a>
+                                <span class="text-primary me-1">KSh {{ related_product.selling_price|floatformat:2 }}</span>
+                                {% if related_product.discount_price %}
+                                <span class="text-body text-decoration-line-through">KSh {{ related_product.price|floatformat:2 }}</span>
+                                {% endif %}
+                                <div class="mt-2">
+                                    <small class="text-muted">{{ related_product.category.name }}</small>
+                                    {% if related_product.brand %}
+                                    <small class="text-muted"> | {{ related_product.brand.name }}</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="d-flex border-top">
+                                <small class="w-50 text-center border-end py-2">
+                                    <a class="text-body" href="{{ related_product.get_absolute_url }}">
+                                        <i class="fa fa-eye text-primary me-2"></i>View detail
+                                    </a>
+                                </small>
+                                <small class="w-50 text-center py-2">
+                                    <a class="text-body" href="#" onclick="addToCart({{ related_product.id }})">
+                                        <i class="fa fa-shopping-bag text-primary me-2"></i>Add to cart
+                                    </a>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Frequently Bought Together -->
+            {% if frequently_bought %}
+            <div class="related-products wow fadeInUp" data-wow-delay="1.1s">
+                <h3 class="mb-4">Frequently Bought Together</h3>
+                <div class="row">
+                    {% for freq_product in frequently_bought %}
+                    <div class="col-xl-3 col-lg-4 col-md-6 wow fadeInUp" data-wow-delay="{{ forloop.counter0|floatformat:1|add:"0.1" }}s">
+                        <div class="product-item">
+                            <div class="position-relative bg-light overflow-hidden">
+                                <img src="{% if freq_product.main_image %}{{ freq_product.main_image.url }}{% else %}{% static 'img/product-placeholder.jpg' %}{% endif %}" 
+                                     alt="{{ freq_product.name }}" class="img-fluid">
+                                {% if freq_product.discount_percentage > 0 %}
+                                <div class="position-absolute top-0 start-0 m-4 py-1 px-3 bg-danger text-white rounded">
+                                    -{{ freq_product.discount_percentage }}%
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="text-center p-4">
+                                <a class="d-block h5 mb-2" href="{{ freq_product.get_absolute_url }}">{{ freq_product.name }}</a>
+                                <span class="text-primary me-1">KSh {{ freq_product.selling_price|floatformat:2 }}</span>
+                                {% if freq_product.discount_price %}
+                                <span class="text-body text-decoration-line-through">KSh {{ freq_product.price|floatformat:2 }}</span>
+                                {% endif %}
+                            </div>
+                            <div class="d-flex border-top">
+                                <small class="w-50 text-center border-end py-2">
+                                    <a class="text-body" href="{{ freq_product.get_absolute_url }}">
+                                        <i class="fa fa-eye text-primary me-2"></i>View detail
+                                    </a>
+                                </small>
+                                <small class="w-50 text-center py-2">
+                                    <a class="text-body" href="#" onclick="addToCart({{ freq_product.id }})">
+                                        <i class="fa fa-shopping-bag text-primary me-2"></i>Add to cart
+                                    </a>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Recently Viewed -->
+            {% if recently_viewed %}
+            <div class="related-products wow fadeInUp" data-wow-delay="1.3s">
+                <h3 class="mb-4">Recently Viewed</h3>
+                <div class="row">
+                    {% for recent_product in recently_viewed %}
+                    <div class="col-xl-3 col-lg-4 col-md-6 wow fadeInUp" data-wow-delay="{{ forloop.counter0|floatformat:1|add:"0.1" }}s">
+                        <div class="product-item">
+                            <div class="position-relative bg-light overflow-hidden">
+                                <img src="{% if recent_product.main_image %}{{ recent_product.main_image.url }}{% else %}{% static 'img/product-placeholder.jpg' %}{% endif %}" 
+                                     alt="{{ recent_product.name }}" class="img-fluid">
+                                {% if recent_product.discount_percentage > 0 %}
+                                <div class="position-absolute top-0 start-0 m-4 py-1 px-3 bg-danger text-white rounded">
+                                    -{{ recent_product.discount_percentage }}%
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="text-center p-4">
+                                <a class="d-block h5 mb-2" href="{{ recent_product.get_absolute_url }}">{{ recent_product.name }}</a>
+                                <span class="text-primary me-1">KSh {{ recent_product.selling_price|floatformat:2 }}</span>
+                                {% if recent_product.discount_price %}
+                                <span class="text-body text-decoration-line-through">KSh {{ recent_product.price|floatformat:2 }}</span>
+                                {% endif %}
+                            </div>
+                            <div class="d-flex border-top">
+                                <small class="w-50 text-center border-end py-2">
+                                    <a class="text-body" href="{{ recent_product.get_absolute_url }}">
+                                        <i class="fa fa-eye text-primary me-2"></i>View detail
+                                    </a>
+                                </small>
+                                <small class="w-50 text-center py-2">
+                                    <a class="text-body" href="#" onclick="addToCart({{ recent_product.id }})">
+                                        <i class="fa fa-shopping-bag text-primary me-2"></i>Add to cart
+                                    </a>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Toast notification for cart actions -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div id="cartToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <i class="fas fa-shopping-cart text-success me-2"></i>
+                <strong class="me-auto">Cart Update</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body" id="toastMessage">
+                Product added to cart successfully!
+            </div>
+        </div>
+    </div>
+
+<script>
+// Global variables
+let currentPage = 1;
+const productSlug = '{{ product.slug }}';
+
+// Change main product image
+function changeMainImage(imageSrc, thumbnail) {
+    document.getElementById('mainProductImage').src = imageSrc;
+    document.getElementById('mainProductImage').setAttribute('data-zoom', imageSrc);
+    
+    // Update active thumbnail
+    document.querySelectorAll('.thumbnail-img').forEach(img => img.classList.remove('active'));
+    thumbnail.classList.add('active');
+}
+
+// Quantity controls
+function increaseQuantity() {
+    const quantityInput = document.getElementById('quantity');
+    const max = parseInt(quantityInput.getAttribute('max'));
+    const current = parseInt(quantityInput.value);
+    
+    if (current < max) {
+        quantityInput.value = current + 1;
+    }
+}
+
+function decreaseQuantity() {
+    const quantityInput = document.getElementById('quantity');
+    const min = parseInt(quantityInput.getAttribute('min'));
+    const current = parseInt(quantityInput.value);
+    
+    if (current > min) {
+        quantityInput.value = current - 1;
+    }
+}
+
+// Add to cart function - Updated to send form data instead of JSON
+async function addToCart(productId) {
+    const quantity = parseInt(document.getElementById('quantity').value);
+    const button = document.querySelector('.btn-add-cart');
+    const originalText = button.innerHTML;
+    
+    // Show loading state
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Adding...';
+    button.disabled = true;
+    
+    try {
+        // Create form data
+        const formData = new FormData();
+        formData.append('product_id', productId);
+        formData.append('quantity', quantity);
+        formData.append('csrfmiddlewaretoken', getCookie('csrftoken'));
+        
+        const response = await fetch(`/cart/add/${productId}/`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            const data = await response.json();
+            
+            if (data.success) {
+                // Show success toast
+                showToast(data.message, 'success');
+                
+                // Update cart count if element exists
+                const cartCount = document.getElementById('cart-count');
+                if (cartCount) {
+                    cartCount.textContent = data.cart_total;
+                    cartCount.style.display = data.cart_total > 0 ? 'inline' : 'none';
+                }
+            } else {
+                showToast(data.message || 'Error adding product to cart', 'error');
+            }
+        } else {
+            // Handle redirect response (non-AJAX)
+            if (response.redirected) {
+                window.location.href = response.url;
+            } else {
+                showToast('Product added to cart successfully!', 'success');
+            }
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showToast('Error adding product to cart', 'error');
+    } finally {
+        // Restore button state
+        button.innerHTML = originalText;
+        button.disabled = false;
+    }
+}
+
+// Load more reviews
+async function loadMoreReviews() {
+    currentPage++;
+    const button = event.target;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Loading...';
+    button.disabled = true;
+    
+    try {
+        const response = await fetch(`{% url "product_reviews" product.slug %}?page=${currentPage}`);
+        const data = await response.json();
+        
+        if (data.reviews && data.reviews.length > 0) {
+            const container = document.getElementById('reviewsContainer');
+            
+            data.reviews.forEach(review => {
+                const reviewHtml = `
+                    <div class="review-item">
+                        <div class="review-rating">
+                            <div class="stars">
+                                ${generateStars(review.rating)}
+                            </div>
+                            <strong>${review.customer_name}</strong>
+                            <small class="text-muted">${review.created_at}</small>
+                        </div>
+                        ${review.title ? `<h6 class="mb-2">${review.title}</h6>` : ''}
+                        <p class="mb-0">${review.comment}</p>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', reviewHtml);
+            });
+            
+            if (!data.has_more) {
+                button.style.display = 'none';
+            } else {
+                button.innerHTML = 'Load More Reviews';
+                button.disabled = false;
+            }
+        }
+    } catch (error) {
+        console.error('Error loading reviews:', error);
+        button.innerHTML = 'Error loading reviews';
+        button.disabled = true;
+    }
+}
+
+// Generate star icons for rating
+function generateStars(rating) {
+    let stars = '';
+    for (let i = 1; i <= 5; i++) {
+        if (i <= rating) {
+            stars += '<i class="fas fa-star"></i>';
+        } else {
+            stars += '<i class="far fa-star"></i>';
+        }
+    }
+    return stars;
+}
+
+// Show toast notification
+function showToast(message, type = 'success') {
+    const toast = document.getElementById('cartToast');
+    const toastMessage = document.getElementById('toastMessage');
+    const toastHeader = toast.querySelector('.toast-header i');
+    
+    toastMessage.textContent = message;
+    
+    // Update toast styling based on type
+    toastHeader.className = type === 'success' 
+        ? 'fas fa-shopping-cart text-success me-2' 
+        : 'fas fa-exclamation-triangle text-danger me-2';
+    
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+}
+
+// Get CSRF token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Image zoom functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const mainImage = document.getElementById('mainProductImage');
+    const zoomContainer = document.querySelector('.zoom-container');
+    
+    if (mainImage && zoomContainer) {
+        let zoomLens = null;
+        
+        // Create zoom lens
+        function createZoomLens() {
+            zoomLens = document.createElement('div');
+            zoomLens.className = 'zoom-lens';
+            zoomContainer.appendChild(zoomLens);
+        }
+        
+        // Handle mouse events for zoom
+        zoomContainer.addEventListener('mouseenter', function() {
+            if (!zoomLens) createZoomLens();
+            zoomLens.style.display = 'block';
+        });
+        
+        zoomContainer.addEventListener('mouseleave', function() {
+            if (zoomLens) zoomLens.style.display = 'none';
+        });
+        
+        zoomContainer.addEventListener('mousemove', function(e) {
+            if (!zoomLens) return;
+            
+            const rect = zoomContainer.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const lensWidth = 100;
+            const lensHeight = 100;
+            
+            let lensX = x - lensWidth / 2;
+            let lensY = y - lensHeight / 2;
+            
+            // Keep lens within bounds
+            lensX = Math.max(0, Math.min(lensX, rect.width - lensWidth));
+            lensY = Math.max(0, Math.min(lensY, rect.height - lensHeight));
+            
+            zoomLens.style.left = lensX + 'px';
+            zoomLens.style.top = lensY + 'px';
+            zoomLens.style.width = lensWidth + 'px';
+            zoomLens.style.height = lensHeight + 'px';
+        });
+    }
+    
+    // Update WhatsApp link with current quantity
+    const quantityInput = document.getElementById('quantity');
+    if (quantityInput) {
+        quantityInput.addEventListener('change', function() {
+            const whatsappLinks = document.querySelectorAll('.btn-whatsapp');
+            const baseMessage = "{{ whatsapp_message|safe }}";
+            const quantity = this.value;
+            
+            whatsappLinks.forEach(link => {
+                const newMessage = baseMessage + `\n\nQuantity: ${quantity}`;
+                const whatsappUrl = `https://wa.me/{{ whatsapp_number }}?text=${encodeURIComponent(newMessage)}`;
+                link.href = whatsappUrl;
+            });
+        });
+    }
+});
+
+// Smooth scrolling for internal links
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+            target.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+        }
+    });
+});
+
+// Lazy loading for product images
+if ('IntersectionObserver' in window) {
+    const imageObserver = new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const img = entry.target;
+                img.src = img.dataset.src;
+                img.classList.remove('lazy');
+                observer.unobserve(img);
+            }
+        });
+    });
+    
+    document.querySelectorAll('img[data-src]').forEach(img => {
+        imageObserver.observe(img);
+    });
+}
+
+// Product view tracking (optional)
+function trackProductView() {
+    // You can implement analytics tracking here
+    // Example: Google Analytics, Facebook Pixel, etc.
+    console.log('Product viewed:', '{{ product.name }}');
+}
+
+// Track product view on page load
+document.addEventListener('DOMContentLoaded', trackProductView);
+</script>
+{% endblock %}
