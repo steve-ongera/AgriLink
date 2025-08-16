@@ -262,83 +262,6 @@ def product_detail(request, slug):
     
     return render(request, 'product_detail.html', context)
 
-@require_POST
-def add_to_cart(request, product_id):
-    """
-    Add product to cart
-    """
-    try:
-        product = get_object_or_404(Product, id=product_id, is_active=True)
-        quantity = int(request.POST.get('quantity', 1))
-        
-        # Check stock availability
-        if not product.is_in_stock:
-            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-                return JsonResponse({
-                    'success': False,
-                    'message': 'Product is out of stock'
-                })
-            else:
-                messages.error(request, 'Product is out of stock')
-                return redirect('product_detail', slug=product.slug)
-        
-        # Check quantity availability
-        if quantity > product.available_quantity:
-            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-                return JsonResponse({
-                    'success': False,
-                    'message': f'Only {product.available_quantity} units available'
-                })
-            else:
-                messages.error(request, f'Only {product.available_quantity} units available')
-                return redirect('product_detail', slug=product.slug)
-        
-        # Get or create cart
-        session_id = request.session.session_key
-        if not session_id:
-            request.session.create()
-            session_id = request.session.session_key
-        
-        cart, created = Cart.objects.get_or_create(session_id=session_id)
-        
-        # If user is logged in and has buyer profile, associate cart
-        if request.user.is_authenticated and hasattr(request.user, 'buyer_profile'):
-            cart.buyer = request.user.buyer_profile
-            cart.save()
-        
-        # Add or update cart item
-        cart_item, created = CartItem.objects.get_or_create(
-            cart=cart,
-            product=product,
-            defaults={'quantity': quantity}
-        )
-        
-        if not created:
-            cart_item.quantity += quantity
-            cart_item.save()
-        
-        # Get updated cart total
-        cart_total = cart.total_items
-        
-        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            return JsonResponse({
-                'success': True,
-                'message': f'{product.name} added to cart',
-                'cart_total': cart_total
-            })
-        else:
-            messages.success(request, f'{product.name} added to cart')
-            return redirect('product_detail', slug=product.slug)
-            
-    except Exception as e:
-        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            return JsonResponse({
-                'success': False,
-                'message': 'Error adding product to cart'
-            })
-        else:
-            messages.error(request, 'Error adding product to cart')
-            return redirect('product_detail', slug=product.slug)
 
 
 def product_list(request):
@@ -744,107 +667,6 @@ def category_products(request, category_slug):
 
 from django.views.decorators.http import require_http_methods
 
-
-@require_http_methods(["POST"])
-def add_to_cart_ajax(request):
-    """
-    AJAX view to add products to cart
-    """
-    try:
-        data = json.loads(request.body)
-        product_id = data.get('product_id')
-        quantity = float(data.get('quantity', 1))
-        
-        if quantity <= 0:
-            return JsonResponse({
-                'success': False,
-                'message': 'Invalid quantity'
-            })
-        
-        # Get the product
-        try:
-            product = Product.objects.get(id=product_id, is_active=True)
-        except Product.DoesNotExist:
-            return JsonResponse({
-                'success': False,
-                'message': 'Product not found'
-            })
-        
-        # Check stock
-        if not product.is_in_stock:
-            return JsonResponse({
-                'success': False,
-                'message': 'Product is out of stock'
-            })
-        
-        if quantity > product.available_quantity:
-            return JsonResponse({
-                'success': False,
-                'message': f'Only {product.available_quantity} {product.unit} available'
-            })
-        
-        if quantity < product.minimum_order:
-            return JsonResponse({
-                'success': False,
-                'message': f'Minimum order is {product.minimum_order} {product.unit}'
-            })
-        
-        # Get or create cart
-        session_key = request.session.session_key
-        if not session_key:
-            request.session.create()
-            session_key = request.session.session_key
-        
-        cart, created = Cart.objects.get_or_create(
-            session_id=session_key,
-            defaults={'buyer': getattr(request.user, 'buyer_profile', None) if request.user.is_authenticated else None}
-        )
-        
-        # Add or update cart item
-        cart_item, item_created = CartItem.objects.get_or_create(
-            cart=cart,
-            product=product,
-            defaults={'quantity': quantity}
-        )
-        
-        if not item_created:
-            # Update existing item
-            new_quantity = cart_item.quantity + quantity
-            
-            # Check total quantity against stock
-            if new_quantity > product.available_quantity:
-                return JsonResponse({
-                    'success': False,
-                    'message': f'Cannot add more. Only {product.available_quantity} {product.unit} available'
-                })
-            
-            cart_item.quantity = new_quantity
-            cart_item.save()
-        
-        # Get cart totals
-        cart_count = cart.total_items
-        cart_total = cart.total_amount
-        
-        return JsonResponse({
-            'success': True,
-            'message': 'Product added to cart successfully',
-            'cart_count': cart_count,
-            'cart_total': float(cart_total),
-            'item_total': float(cart_item.total_price)
-        })
-        
-    except json.JSONDecodeError:
-        return JsonResponse({
-            'success': False,
-            'message': 'Invalid JSON data'
-        })
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'message': 'An error occurred while adding to cart'
-        })
- 
-
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from .models import ContactMessage
@@ -882,3 +704,422 @@ def custom_page_not_found(request, exception):
 
 def custom_server_error(request):
     return render(request, '500.html', status=500)
+
+
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib import messages
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
+from django.views.generic import View
+from django.db import transaction
+from django.core.exceptions import ValidationError
+from decimal import Decimal
+import json
+import uuid
+
+from .models import (
+    Product, Cart, CartItem, Order, OrderItem, 
+    BuyerProfile, County, CustomUser
+)
+
+
+def get_or_create_cart(request):
+    """Get or create cart for the current session/user"""
+    if request.user.is_authenticated:
+        try:
+            buyer_profile = request.user.buyer_profile
+            cart, created = Cart.objects.get_or_create(
+                buyer=buyer_profile,
+                defaults={'session_id': request.session.session_key or str(uuid.uuid4())}
+            )
+        except BuyerProfile.DoesNotExist:
+            # If authenticated user doesn't have buyer profile, use session
+            session_id = request.session.session_key
+            if not session_id:
+                request.session.create()
+                session_id = request.session.session_key
+            cart, created = Cart.objects.get_or_create(session_id=session_id)
+    else:
+        # Anonymous user - use session
+        session_id = request.session.session_key
+        if not session_id:
+            request.session.create()
+            session_id = request.session.session_key
+        cart, created = Cart.objects.get_or_create(session_id=session_id)
+    
+    return cart
+
+
+@require_http_methods(["POST"])
+def add_to_cart(request, product_id=None):
+    """Add product to cart - handles both AJAX and form submissions"""
+    
+    # Get product ID from URL parameter or POST data
+    if not product_id:
+        product_id = request.POST.get('product_id')
+    
+    if not product_id:
+        if request.headers.get('Content-Type') == 'application/json':
+            return JsonResponse({'success': False, 'message': 'Product ID is required'})
+        messages.error(request, 'Product ID is required')
+        return redirect('product_list')
+    
+    try:
+        product = get_object_or_404(Product, id=product_id, is_active=True)
+        
+        # Get quantity from request
+        if request.content_type == 'application/json':
+            data = json.loads(request.body)
+            quantity = Decimal(str(data.get('quantity', 1)))
+        else:
+            quantity = Decimal(str(request.POST.get('quantity', 1)))
+        
+        # Validate quantity
+        if quantity <= 0:
+            raise ValidationError("Quantity must be greater than 0")
+        
+        if quantity < product.minimum_order:
+            raise ValidationError(f"Minimum order quantity is {product.minimum_order} {product.unit}")
+        
+        if product.available_quantity > 0 and quantity > product.available_quantity:
+            raise ValidationError(f"Only {product.available_quantity} {product.unit} available")
+        
+        # Check if product is in stock
+        if not product.is_in_stock:
+            raise ValidationError("Product is currently out of stock")
+        
+        # Get or create cart
+        cart = get_or_create_cart(request)
+        
+        # Add or update cart item
+        cart_item, created = CartItem.objects.get_or_create(
+            cart=cart,
+            product=product,
+            defaults={'quantity': quantity}
+        )
+        
+        if not created:
+            # Update existing cart item
+            cart_item.quantity += quantity
+            
+            # Check if new quantity exceeds available stock
+            if (product.available_quantity > 0 and 
+                cart_item.quantity > product.available_quantity):
+                cart_item.quantity = product.available_quantity
+                
+            cart_item.save()
+            action = 'updated'
+        else:
+            action = 'added'
+        
+        # For AJAX requests
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': True,
+                'message': f'Product {action} to cart successfully',
+                'cart_count': cart.total_items,
+                'cart_total': float(cart.total_amount),
+                'item_quantity': float(cart_item.quantity),
+                'item_total': float(cart_item.total_price)
+            })
+        
+        # For form submissions
+        messages.success(request, f'{product.name} {action} to cart successfully!')
+        return redirect(request.META.get('HTTP_REFERER', 'cart_detail'))
+        
+    except ValidationError as e:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'message': str(e)})
+        messages.error(request, str(e))
+        return redirect(request.META.get('HTTP_REFERER', 'product_list'))
+    
+    except Exception as e:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'message': 'An error occurred'})
+        messages.error(request, 'An error occurred while adding to cart')
+        return redirect(request.META.get('HTTP_REFERER', 'product_list'))
+
+
+def cart_detail(request):
+    """Display cart contents"""
+    cart = get_or_create_cart(request)
+    cart_items = cart.items.select_related('product', 'product__farmer', 'product__category').all()
+    
+    # Group items by farmer for delivery calculation
+    farmers_items = {}
+    for item in cart_items:
+        farmer_id = item.product.farmer.id
+        if farmer_id not in farmers_items:
+            farmers_items[farmer_id] = {
+                'farmer': item.product.farmer,
+                'items': [],
+                'subtotal': Decimal('0.00')
+            }
+        farmers_items[farmer_id]['items'].append(item)
+        farmers_items[farmer_id]['subtotal'] += item.total_price
+    
+    context = {
+        'cart': cart,
+        'cart_items': cart_items,
+        'farmers_items': farmers_items,
+        'subtotal': cart.total_amount,
+        'delivery_fee_estimate': cart.delivery_fee_estimate,
+        'total_estimate': cart.total_amount + cart.delivery_fee_estimate,
+        'total_farmers': len(farmers_items),
+    }
+    
+    return render(request, 'cart/cart_detail.html', context)
+
+
+@require_http_methods(["POST"])
+def update_cart_item(request):
+    """Update cart item quantity via AJAX"""
+    try:
+        data = json.loads(request.body)
+        item_id = data.get('item_id')
+        new_quantity = Decimal(str(data.get('quantity', 1)))
+        
+        cart = get_or_create_cart(request)
+        cart_item = get_object_or_404(CartItem, id=item_id, cart=cart)
+        
+        # Validate quantity
+        if new_quantity <= 0:
+            raise ValidationError("Quantity must be greater than 0")
+        
+        if new_quantity < cart_item.product.minimum_order:
+            raise ValidationError(f"Minimum order quantity is {cart_item.product.minimum_order}")
+        
+        if (cart_item.product.available_quantity > 0 and 
+            new_quantity > cart_item.product.available_quantity):
+            raise ValidationError(f"Only {cart_item.product.available_quantity} available")
+        
+        cart_item.quantity = new_quantity
+        cart_item.save()
+        
+        return JsonResponse({
+            'success': True,
+            'item_total': float(cart_item.total_price),
+            'cart_total': float(cart.total_amount),
+            'cart_count': cart.total_items,
+            'delivery_estimate': float(cart.delivery_fee_estimate)
+        })
+        
+    except ValidationError as e:
+        return JsonResponse({'success': False, 'message': str(e)})
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': 'An error occurred'})
+
+
+@require_http_methods(["POST"])
+def remove_cart_item(request, item_id):
+    """Remove item from cart"""
+    try:
+        cart = get_or_create_cart(request)
+        cart_item = get_object_or_404(CartItem, id=item_id, cart=cart)
+        product_name = cart_item.product.name
+        cart_item.delete()
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': True,
+                'message': f'{product_name} removed from cart',
+                'cart_total': float(cart.total_amount),
+                'cart_count': cart.total_items,
+            })
+        
+        messages.success(request, f'{product_name} removed from cart')
+        return redirect('cart_detail')
+        
+    except Exception as e:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'message': 'An error occurred'})
+        messages.error(request, 'An error occurred')
+        return redirect('cart_detail')
+
+
+def clear_cart(request):
+    """Clear all items from cart"""
+    cart = get_or_create_cart(request)
+    cart.items.all().delete()
+    
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'success': True, 'message': 'Cart cleared'})
+    
+    messages.success(request, 'Cart cleared successfully')
+    return redirect('cart_detail')
+
+
+@login_required
+def checkout(request):
+    """Checkout process - requires login"""
+    try:
+        buyer_profile = request.user.buyer_profile
+    except BuyerProfile.DoesNotExist:
+        messages.error(request, 'Please complete your buyer profile first')
+        return redirect('create_buyer_profile')
+    
+    cart = get_or_create_cart(request)
+    cart_items = cart.items.select_related('product', 'product__farmer').all()
+    
+    if not cart_items.exists():
+        messages.warning(request, 'Your cart is empty')
+        return redirect('cart_detail')
+    
+    # Check stock availability for all items
+    out_of_stock_items = []
+    for item in cart_items:
+        if not item.product.is_in_stock:
+            out_of_stock_items.append(item.product.name)
+        elif (item.product.available_quantity > 0 and 
+              item.quantity > item.product.available_quantity):
+            out_of_stock_items.append(f"{item.product.name} (only {item.product.available_quantity} available)")
+    
+    if out_of_stock_items:
+        messages.error(request, f"Some items are out of stock: {', '.join(out_of_stock_items)}")
+        return redirect('cart_detail')
+    
+    # Calculate totals
+    subtotal = cart.total_amount
+    delivery_fee = cart.delivery_fee_estimate
+    service_fee = subtotal * Decimal('0.05')  # 5% service fee
+    total_amount = subtotal + delivery_fee + service_fee
+    
+    # Group items by farmer
+    farmers_items = {}
+    for item in cart_items:
+        farmer_id = item.product.farmer.id
+        if farmer_id not in farmers_items:
+            farmers_items[farmer_id] = {
+                'farmer': item.product.farmer,
+                'items': [],
+                'subtotal': Decimal('0.00')
+            }
+        farmers_items[farmer_id]['items'].append(item)
+        farmers_items[farmer_id]['subtotal'] += item.total_price
+    
+    # Get available counties for delivery
+    counties = County.objects.all().order_by('name')
+    
+    context = {
+        'cart': cart,
+        'cart_items': cart_items,
+        'farmers_items': farmers_items,
+        'buyer_profile': buyer_profile,
+        'subtotal': subtotal,
+        'delivery_fee': delivery_fee,
+        'service_fee': service_fee,
+        'total_amount': total_amount,
+        'counties': counties,
+    }
+    
+    return render(request, 'cart/checkout.html', context)
+
+
+@login_required
+@transaction.atomic
+def process_checkout(request):
+    """Process the checkout and create order"""
+    if request.method != 'POST':
+        return redirect('checkout')
+    
+    try:
+        buyer_profile = request.user.buyer_profile
+    except BuyerProfile.DoesNotExist:
+        messages.error(request, 'Buyer profile not found')
+        return redirect('checkout')
+    
+    cart = get_or_create_cart(request)
+    cart_items = cart.items.select_related('product', 'product__farmer').all()
+    
+    if not cart_items.exists():
+        messages.error(request, 'Your cart is empty')
+        return redirect('cart_detail')
+    
+    # Get form data
+    delivery_address = request.POST.get('delivery_address', '').strip()
+    delivery_phone = request.POST.get('delivery_phone', '').strip()
+    delivery_county_id = request.POST.get('delivery_county')
+    delivery_notes = request.POST.get('delivery_notes', '').strip()
+    payment_method = request.POST.get('payment_method', 'mpesa')
+    
+    # Validate required fields
+    if not all([delivery_address, delivery_phone, delivery_county_id]):
+        messages.error(request, 'Please fill in all required delivery information')
+        return redirect('checkout')
+    
+    try:
+        delivery_county = County.objects.get(id=delivery_county_id)
+    except County.DoesNotExist:
+        messages.error(request, 'Invalid delivery county selected')
+        return redirect('checkout')
+    
+    # Final stock check
+    for item in cart_items:
+        if not item.product.is_in_stock:
+            messages.error(request, f'{item.product.name} is no longer in stock')
+            return redirect('checkout')
+        elif (item.product.available_quantity > 0 and 
+              item.quantity > item.product.available_quantity):
+            messages.error(request, f'Only {item.product.available_quantity} {item.product.unit} of {item.product.name} available')
+            return redirect('checkout')
+    
+    # Calculate totals
+    subtotal = cart.total_amount
+    delivery_fee = cart.delivery_fee_estimate
+    service_fee = subtotal * Decimal('0.05')
+    total_amount = subtotal + delivery_fee + service_fee
+    
+    # Create order
+    order = Order.objects.create(
+        buyer=buyer_profile,
+        delivery_address=delivery_address,
+        delivery_phone=delivery_phone,
+        delivery_county=delivery_county,
+        delivery_notes=delivery_notes,
+        subtotal=subtotal,
+        delivery_fee=delivery_fee,
+        service_fee=service_fee,
+        total_amount=total_amount,
+        payment_method=payment_method,
+        status='pending'
+    )
+    
+    # Create order items and update product quantities
+    for cart_item in cart_items:
+        OrderItem.objects.create(
+            order=order,
+            product=cart_item.product,
+            farmer=cart_item.product.farmer,
+            quantity=cart_item.quantity,
+            unit_price=cart_item.product.selling_price,
+            total_price=cart_item.total_price,
+            product_name=cart_item.product.name,
+            product_sku=cart_item.product.sku,
+            unit=cart_item.product.unit
+        )
+        
+        # Update product quantity if tracked
+        if cart_item.product.available_quantity > 0:
+            cart_item.product.available_quantity -= cart_item.quantity
+            cart_item.product.save(update_fields=['available_quantity'])
+    
+    # Clear cart
+    cart.items.all().delete()
+    
+    # Redirect based on payment method
+    if payment_method == 'mpesa':
+        messages.success(request, f'Order #{order.order_number} created successfully. Please complete M-Pesa payment.')
+        return redirect('order_payment', order_number=order.order_number)
+    else:
+        messages.success(request, f'Order #{order.order_number} created successfully.')
+        return redirect('order_detail', order_number=order.order_number)
+
+
+# Utility view for AJAX cart count
+def cart_count(request):
+    """Return current cart count for AJAX requests"""
+    cart = get_or_create_cart(request)
+    return JsonResponse({'cart_count': cart.total_items})
