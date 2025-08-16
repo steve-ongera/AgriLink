@@ -219,7 +219,7 @@ class ProductAdmin(admin.ModelAdmin):
     list_display = ['name', 'farmer_name', 'category', 'price_display', 'available_quantity', 'stock_status', 'is_active', 'view_count']
     list_filter = ['category', 'subcategory', 'stock_status', 'quality_grade', 'is_active', 'is_featured', 'is_organic']
     search_fields = ['name', 'sku', 'farmer__farm_name', 'farmer__user__username']
-    readonly_fields = ['slug', 'sku', 'total_sold', 'view_count']
+    readonly_fields = [ 'sku', 'total_sold', 'view_count']
     prepopulated_fields = {'slug': ('name',)}
     inlines = [ProductImageInline]
     date_hierarchy = 'created_at'

@@ -34,12 +34,7 @@ def index(request):
         if not main_image:
             main_image = product.images.first()
         product.main_image = main_image
-        
-        # Calculate discount percentage
-        if product.discount_price and product.discount_price < product.price:
-            product.discount_percentage = round(((product.price - product.discount_price) / product.price) * 100)
-        else:
-            product.discount_percentage = 0
+        # Note: discount_percentage is already calculated as a property in the model
     
     # Get active categories with product count
     categories = Category.objects.filter(is_active=True).annotate(
@@ -76,19 +71,14 @@ def index(request):
         stock_status__in=['available', 'low_stock']
     ).select_related('category', 'subcategory', 'farmer').prefetch_related('images')[:8]
     
-    # Add main_image and discount_percentage to all product querysets
+    # Add main_image to all product querysets
     for product_list in [vegetables, fruits, new_products, organic_products]:
         for product in product_list:
             main_image = product.images.filter(is_main=True).first()
             if not main_image:
                 main_image = product.images.first()
             product.main_image = main_image
-            
-            # Calculate discount percentage
-            if product.discount_price and product.discount_price < product.price:
-                product.discount_percentage = round(((product.price - product.discount_price) / product.price) * 100)
-            else:
-                product.discount_percentage = 0
+            # Note: discount_percentage is already calculated as a property in the model
     
     context = {
         'featured_products': featured_products,
@@ -100,8 +90,6 @@ def index(request):
     }
     
     return render(request, 'home.html', context)
-
-
 def product_detail(request, slug):
     """
     Product detail page view
@@ -205,12 +193,7 @@ def product_detail(request, slug):
         if not related_main_image:
             related_main_image = related_product.images.first()
         related_product.main_image = related_main_image
-        
-        # Calculate discount percentage for related products
-        if related_product.discount_price and related_product.discount_price < related_product.price:
-            related_product.discount_percentage = round(((related_product.price - related_product.discount_price) / related_product.price) * 100)
-        else:
-            related_product.discount_percentage = 0
+        # Note: discount_percentage is already calculated as a property in the model
     
     # Get frequently bought together products (mock implementation)
     # In a real scenario, you'd analyze order history
@@ -226,12 +209,7 @@ def product_detail(request, slug):
         if not freq_main_image:
             freq_main_image = freq_product.images.first()
         freq_product.main_image = freq_main_image
-        
-        # Calculate discount percentage
-        if freq_product.discount_price and freq_product.discount_price < freq_product.price:
-            freq_product.discount_percentage = round(((freq_product.price - freq_product.discount_price) / freq_product.price) * 100)
-        else:
-            freq_product.discount_percentage = 0
+        # Note: discount_percentage is already calculated as a property in the model
     
     # Get recently viewed products from session
     recently_viewed_ids = request.session.get('recently_viewed', [])
@@ -252,12 +230,7 @@ def product_detail(request, slug):
         if not recent_main_image:
             recent_main_image = recent_product.images.first()
         recent_product.main_image = recent_main_image
-        
-        # Calculate discount percentage
-        if recent_product.discount_price and recent_product.discount_price < recent_product.price:
-            recent_product.discount_percentage = round(((recent_product.price - recent_product.discount_price) / recent_product.price) * 100)
-        else:
-            recent_product.discount_percentage = 0
+        # Note: discount_percentage is already calculated as a property in the model
     
     # WhatsApp integration
     whatsapp_number = "+254700000000"  # Replace with actual WhatsApp number from settings
@@ -288,7 +261,6 @@ def product_detail(request, slug):
     }
     
     return render(request, 'product_detail.html', context)
-
 
 @require_POST
 def add_to_cart(request, product_id):
